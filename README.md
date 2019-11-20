@@ -1,12 +1,6 @@
 # canvas-userscripts
 > Various userscripts to enhance functionality in the Canvas Learning Management System.
 
-## Available Userscripts
-
-### custom_columns.js
-
-Adds buttons to the Canvas gradebook allowing you to create or delete custom gradebook columns.
-
 ## Installation
 
 Start by installing a userscript manager such as [Tampermonkey](https://www.tampermonkey.net/).
@@ -15,4 +9,4 @@ Then, click on the script you wish to use from this repository. Click "Raw". Tam
 
 ## Usage
 
-See usage details for each individual script under [Available Userscripts](#available-userscripts).
+See usage details for each individual script by visiting CU Boulder's [Canvas Enhancements help page](https://oit.colorado.edu/services/teaching-learning-applications/canvas/enhancements-integrations/enhancements#oit).
