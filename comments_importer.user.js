@@ -98,8 +98,7 @@ defer(function() {
             complete: function(results) {
                 $("#comments_file").val('');
                 var data = results.data;
-                // var referral = ' Visit <a href="https://oit.colorado.edu/services/teaching-learning-applications/canvas/enhancements-integrations/enhancements#oit" target="_blank">Canvas - Enhancements</a> for formatting guidelines.';
-                var referral = ' Visit the <a href="https://docs.google.com/document/d/1k6i57lVqPYzze-K3cFRQhNl6htNh9AB-u-iq6wFp3f0/edit?usp=sharing" target="_blank">Comments Importer Guide</a> for formatting guidelines.';
+                var referral = ' Visit <a href="https://oit.colorado.edu/services/teaching-learning-applications/canvas/enhancements-integrations/enhancements#oit" target="_blank">Canvas - Enhancements</a> for formatting guidelines.';
                 if (data.length < 1) {
                     popUp("ERROR: File should contain a header row and at least one data row." + referral);
                     $("#comments_file").show();
