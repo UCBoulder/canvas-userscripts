@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Copy & Offset Assignment Dates
 // @namespace    https://github.com/CUBoulder-OIT
-// @description  Bulk import assignment comments into the Canvas gradebook.
+// @description  Copy all "Assign to" dates from one assignment to another, with offset.
 // @include      https://canvas.*.edu/courses/*/assignments/*
 // @include      https://*.*instructure.com/courses/*/assignments/*
 // @require      https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.2/moment-with-locales.min.js
