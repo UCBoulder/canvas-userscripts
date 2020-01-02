@@ -68,21 +68,22 @@ defer(function() {
 <p>
 Copy all "Assign to" options and dates from the current assignment to another assignment. This will overwrite ALL "Assign to" options and dates for the destination assignment.
 </p>
-<br>
+<hr>
 <p>Copy from: ${srcAssign.name}</p>
 <form id="caod_form">
 <label>Copy to</label>
 <select name="caod_assignment">
 ${assignOptions}
 </select>
-<br>
-<label>Offset</label>
-<input type="number" autocomplete="off" name="caod_offset">
-<br>
+<hr>
 <label>Offset Type</label>
 <select name="caod_offset_type">
 ${unitsOptions}
 </select>
+<br>
+<label>Offset Amount</label>
+<input type="number" autocomplete="off" name="caod_offset">
+<br>
 <br>
 <input type="submit" value="Submit" class="btn btn-primary">
 ${infoHtml}
