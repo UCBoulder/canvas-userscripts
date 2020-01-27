@@ -8,7 +8,7 @@
 // @require      https://cdnjs.cloudflare.com/ajax/libs/moment-timezone/0.5.23/moment-timezone-with-data.min.js
 // @grant        none
 // @run-at       document-idle
-// @version      1.0.0
+// @version      1.0.1
 // ==/UserScript==
 
 /* globals $ moment */
@@ -169,9 +169,14 @@ ${infoHtml}
     }
 
     // add offset dates button to assignment page
-    var copyButton = $('<button type="button" id="caod_button" class="btn Button" role="button">Copy & Offset Dates</button>');
-    $("#assignment_show > div.content-box").prepend(copyButton);
-    copyButton.click(function() {
+    if ($("#assignment_show > div.content-box").length) {
+         // regular assignment
+         $("#assignment_show > div.content-box").prepend($('<button type="button" id="caod_button" class="btn Button" role="button">Copy & Offset Dates</button>'));
+    } else {
+        // external tool assignment
+        $("#content > div.tool_content_wrapper").after($('<div class="content-box"><button type="button" id="caod_button" class="btn Button" role="button">Copy & Offset Dates</button></div>'));
+    }
+    $("#caod_button").click(function() {
         popUp("Loading assignments. Please wait.");
 
         // get data necessary for rendering the form
