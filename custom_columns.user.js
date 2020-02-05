@@ -1,13 +1,25 @@
 // ==UserScript==
 // @name         Custom Column Manager
-// @namespace    https://github.com/CUBoulder-OIT 
+// @namespace    https://github.com/CUBoulder-OIT
 // @description  Add buttons to create and delete custom gradebook columns in Canvas LMS.
 // @include      https://canvas.*.edu/*/gradebook
 // @include      https://*.*instructure.com/*/gradebook
 // @grant        none
 // @run-at       document-idle
-// @version      1.0.0
+// @version      1.1.0
 // ==/UserScript==
+
+/* globals $ */
+
+// wait until the window jQuery is loaded
+function defer(method) {
+    if (typeof $ !== 'undefined') {
+        method();
+    }
+    else {
+        setTimeout(function() { defer(method); }, 100);
+    }
+}
 
 function rmColumn() {
     var colName = prompt("Enter the name of the column you wish to delete.\n\nWARNING: All data in this column will be permanently lost!", "");
@@ -53,7 +65,7 @@ function addColumn() {
         var colUrl = "/api/v1/courses/" + courseId + "/custom_gradebook_columns";
         //get a list of existing columns
         $.get(colUrl, function(data) {
-            for (var col in result) {
+            for (var col in data) {
                 //if a column with this name already exists, quit
                 if (col.title === colName) {
                     alert('A column named "' + colName + '" already exists.');
@@ -76,17 +88,13 @@ function addColumn() {
     }
 }
 
-(function() {
+defer(function() {
     'use strict';
-    var rmColBtn = $('<button class="btn" role="button" aria-label="Delete Custom Column" id="rmColumnBtn">Delete Column</button>');
-    var addColBtn = $('<button class="btn" role="button" aria-label="Add Custom Column" id="addColumnBtn"><i class="icon-plus"/> Column</button>');
-    if ($("#gradebook-actions").length) {
-        $("#gradebook-actions").prepend(rmColBtn);
-        $("#gradebook-actions").prepend(addColBtn);
-    } else {
-        $(".gradebook_menu").prepend(rmColBtn);
-        $(".gradebook_menu").prepend(addColBtn);
-    }
+    var colDiv = $(`<div>
+<button class="btn" role="button" aria-label="Add Custom Column" id="addColumnBtn"><i class="icon-plus"/> Column</button>
+<button class="btn" role="button" aria-label="Delete Custom Column" id="rmColumnBtn">Delete Column</button>
+</div>`);
+    $("#gradebook-actions").prepend(colDiv);
     $("#rmColumnBtn").click(rmColumn);
     $("#addColumnBtn").click(addColumn);
-})();
+});
