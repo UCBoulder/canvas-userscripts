@@ -7,7 +7,7 @@
 // @grant        none
 // @require      https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.1.0/papaparse.min.js
 // @run-at       document-idle
-// @version      1.0.0
+// @version      1.1.0
 // ==/UserScript==
 
 /* globals $ Papa*/
@@ -78,18 +78,14 @@ defer(function() {
     }
 
     // add choose file button to gradebook
-    var importForm = $('<input type="file" id="comments_file"/>');
-    var importLabel = $('<label for="comments_file" style="padding-right:10px;">Import comments: </label>');
-    if ($("#gradebook-actions").length) {
-        $("#gradebook-actions").prepend(importForm);
-        $("#gradebook-actions").prepend(importLabel);
-    } else {
-        $(".gradebook_menu").prepend(importForm);
-        $(".gradebook_menu").prepend(importLabel);
-    }
+    var importDiv = $(`<div style="padding-top:10px;>
+<label for="comments_file">Import comments: </label>
+<input type="file" id="comments_file"/>
+</div>`);
+    $("div.gradebook-menus").append(importDiv);
 
     // handle when file is selected
-    importForm.change(function(evt) {
+    $('#comments_file').change(function(evt) {
         $("#comments_file").hide();
         // parse CSV
         Papa.parse(evt.target.files[0], {
