@@ -8,7 +8,7 @@
 // @require      https://cdnjs.cloudflare.com/ajax/libs/moment-timezone/0.5.23/moment-timezone-with-data.min.js
 // @grant        none
 // @run-at       document-idle
-// @version      1.0.1
+// @version      1.0.2
 // ==/UserScript==
 
 /* globals $ moment */
@@ -181,10 +181,10 @@ ${infoHtml}
 
         // get data necessary for rendering the form
         var courseId = window.location.href.split('/')[4];
-        var srcAssign = window.location.href.split('/')[6];
-        $.getJSON(`/api/v1/courses/${courseId}/assignments`, function(allAssigns) {
+        var srcAssignId = window.location.href.split('/')[6];
+        $.getJSON(`/api/v1/courses/${courseId}/assignments?per_page=100`, function(allAssigns) {
             $.getJSON(`/api/v1/courses/${courseId}`, function(courseData) {
-                $.getJSON(`/api/v1/courses/${courseData.id}/assignments/${srcAssign}?include[]=overrides&override_assignment_dates=false`, function(srcAssign) {
+                $.getJSON(`/api/v1/courses/${courseData.id}/assignments/${srcAssignId}?include[]=overrides&override_assignment_dates=false`, function(srcAssign) {
                     popClose();
                     openForm(allAssigns, srcAssign, null, null, function(formData) { processForm(formData, srcAssign, allAssigns, courseData); });
                 });
