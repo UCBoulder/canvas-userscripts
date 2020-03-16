@@ -6,7 +6,7 @@
 // @include      https://*.*instructure.com/courses/*/gradebook/speed_grader?*
 // @grant        none
 // @run-at       document-idle
-// @version      1.0.1
+// @version      1.0.2
 // ==/UserScript==
 
 /* globals $ */
@@ -129,7 +129,7 @@ defer(function() {
     // prep jquery info dialog
     $("body").append($('<div id="srr_dialog" title="Save Rubric Row"></div>'));
 
-    waitForElement('tbody.criterions', function() {
+    waitForElement('#rubric_assessments_list_and_edit_button_holder > div > button', function() {
         $('#rubric_assessments_list_and_edit_button_holder > div > button').click(function() {
             // Add in buttons if they don't already exist
             if ($('#save_row_0').length === 0) {
