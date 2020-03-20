@@ -2,7 +2,6 @@
 // @name         Speedgrader Word Count
 // @namespace    https://github.com/CUBoulder-OIT
 // @description  Displays a word count for documents within Speedgrader
-// @include      https://canvas.*.edu/api/v1/canvadoc_session?*
 // @include      https://canvadocs.instructure.com/*
 // @require      https://code.jquery.com/jquery-1.12.4.min.js
 // @grant        none
