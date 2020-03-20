@@ -48,7 +48,7 @@ function waitForElement(selector, callback) {
     'use strict';
 
     waitForElement('div.TextLayer-container > div > div', function() {
-        $('#App > nav > div > div.ViewerControls--title').append('<span id="swc_display">Word count:</span>');
+        $('#App > nav > div > div.ViewerControls--title').append('<span id="swc_display" style="margin-right: 1em">Word count:</span>');
         updateWordCount(0, 0);
     });
 })();
