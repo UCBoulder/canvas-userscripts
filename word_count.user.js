@@ -6,14 +6,14 @@
 // @require      https://code.jquery.com/jquery-1.12.4.min.js
 // @grant        none
 // @run-at       document-idle
-// @version      1.0.0
+// @version      1.0.1
 // ==/UserScript==
 
 /* globals $ */
 
 function getWordCount() {
     var wc = 0;
-    $('div.TextLayer-container > div > div').each(function(divIndex) {
+    $('div.textLayer > span').each(function(divIndex) {
         wc += $(this).text().split(/\s+\b/).length;
     });
     return wc;
@@ -46,7 +46,7 @@ function waitForElement(selector, callback) {
 (function() {
     'use strict';
 
-    waitForElement('div.TextLayer-container > div > div', function() {
+    waitForElement('div.textLayer', function() {
         $('#App > nav > div > div.ViewerControls--title').append('<span id="swc_display" style="margin-right: 1em">Word count:</span>');
         updateWordCount(0, 0);
     });
