@@ -7,14 +7,14 @@
 // @grant        none
 // @require      https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.16.4/xlsx.full.min.js
 // @run-at       document-idle
-// @version      1.0.0
+// @version      1.0.1
 // ==/UserScript==
 
 /* globals $ XLSX */
 
 // wait until the window jQuery is loaded
 function defer(method) {
-    if (typeof $ !== 'undefined') {
+    if (typeof $ !== 'undefined' && typeof $().dialog !== 'undefined') {
         method();
     }
     else {
@@ -39,10 +39,11 @@ var saveText = (function () {
 
 // utility function for getting value based on field name from serialized form data
 function getFormValue(name, serial) {
+    var dc = s => decodeURIComponent(s.replace(/\+/g, '%20'));
     for (const elem of serial.split('&')) {
         var pair = elem.split('=');
-        if (pair[0] === name) {
-            return pair[1];
+        if (dc(pair[0]) === name) {
+            return dc(pair[1]);
         }
     }
 }
@@ -66,6 +67,9 @@ function getRemainingPages(nextUrl, listSoFar, callback) {
         } else {
             getRemainingPages(nextLink, listSoFar.concat(responseList), callback);
         }
+    }).fail(function (jqXHR, textStatus, errorThrown) {
+        popUp(`ERROR ${jqXHR.status} while retrieving data from Canvas. Please refresh and try again.`, null);
+        $("#zoom_file").show();
     });
 }
 
@@ -118,6 +122,9 @@ ${groupOptions}
         });
         $("#zoom_form_dialog").dialog("open");
 
+    }).fail(function (jqXHR, textStatus, errorThrown) {
+        popUp(`ERROR ${jqXHR.status} while getting list of assignment groups. Please refresh and try again.`, null);
+        $("#zoom_file").show();
     });
 }
 
@@ -263,19 +270,26 @@ function saveAttendance(formData, attendData) {
                 });
             }
 
-            // send requests in chunks of 20 every 1.5 seconds to avoid rate-limiting
+            // send requests in chunks of 10 every second to avoid rate-limiting
             var errors = [];
             var completed = 0;
-            var chunkSize = 20;
+            var chunkSize = 10;
             function sendChunk(i) {
                 for (const request of requests.slice(i, i + chunkSize)) {
                     $.ajax(request.request).fail(function(jqXHR, textStatus, errorThrown) {
-                        errors.push(`${request.error}${jqXHR.status} - ${errorThrown}\n`);
+                        if (jqXHR.status == 500) {
+                            // Canvas sometimes gets random server errors, so retry
+                            $.ajax(request.request).fail(function(jqXHR, textStatus, errorThrown) {
+                                errors.push(`${request.error}${jqXHR.status} - ${errorThrown}\n`);
+                            });
+                        } else {
+                            errors.push(`${request.error}${jqXHR.status} - ${errorThrown}\n`);
+                        }
                     }).always(requestSent);
                 }
                 showProgress(i * 100 / requests.length);
                 if (i + chunkSize < requests.length) {
-                    setTimeout(sendChunk, 1500, i + chunkSize);
+                    setTimeout(sendChunk, 1000, i + chunkSize);
                 }
             }
 
