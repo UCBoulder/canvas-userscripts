@@ -7,14 +7,14 @@
 // @grant        none
 // @require      https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.1.0/papaparse.min.js
 // @run-at       document-idle
-// @version      1.1.0
+// @version      1.1.1
 // ==/UserScript==
 
-/* globals $ Papa*/
+/* globals $ Papa */
 
 // wait until the window jQuery is loaded
 function defer(method) {
-    if (typeof $ !== 'undefined') {
+    if (typeof $ !== 'undefined' && typeof $().dialog !== 'undefined') {
         method();
     }
     else {
@@ -42,17 +42,18 @@ defer(function() {
 
     // prep jquery info dialog
     $("body").append($('<div id="comments_dialog" title="Import Comments"></div>'));
+    $("#comments_dialog").dialog({ autoOpen: false });
     function popUp(text) {
         $("#comments_dialog").html(`<p>${text}</p>`);
-        $("#comments_dialog").dialog();
+        $("#comments_dialog").dialog('open');
     }
 
     // prep jquery confirm dialog
     $("body").append($('<div id="comments_modal" title="Import Comments"></div>'));
+    $("#comments_modal").dialog({ modal: true, autoOpen: false });
     function confirm(text, callback) {
         $("#comments_modal").html(`<p>${text}</p>`);
         $("#comments_modal").dialog({
-            modal: true,
             buttons: {
                 "Confirm": function() {
                     $(this).dialog("close");
@@ -64,16 +65,18 @@ defer(function() {
                 }
             }
         });
+        $("#comments_modal").dialog('open');
     }
 
     // prep jquery progress dialog
     $("body").append($('<div id="comments_progress" title="Import Comments"><p>Importing comments. Do not navigate from this page.</p><div id="comments_bar"></div></div>'));
+    $("#comments_progress").dialog({ buttons: {}, autoOpen: false });
     function showProgress(amount) {
         if (amount === 100) {
             $("#comments_progress").dialog("close");
         } else {
             $("#comments_bar").progressbar({ value: amount });
-            $("#comments_progress").dialog({ buttons: {} });
+            $("#comments_progress").dialog("open");
         }
     }
 
@@ -146,12 +149,6 @@ defer(function() {
                         });
                     }
                 }
-                if (requests.length > 10000) {
-                    // safeguard against abuse
-                    popUp(`ERROR: ${requests.length} comments is above the max of 10000 per import. Please split file into smaller chunks.`);
-                    $("#comments_file").show();
-                    return;
-                }
 
                 // confirm before proceeding
                 confirm(
@@ -159,10 +156,10 @@ defer(function() {
                     function(confirmed) {
                         if (confirmed) {
 
-                            // send requests in chunks of 20 every 1.5 seconds to avoid rate-limiting
+                            // send requests in chunks of 10 every second to avoid rate-limiting
                             var errors = [];
                             var completed = 0;
-                            var chunkSize = 20;
+                            var chunkSize = 10;
                             function sendChunk(i) {
                                 for (const request of requests.slice(i, i+chunkSize)) {
                                     $.ajax(request.request).fail(function(jqXHR, textStatus, errorThrown) {
@@ -171,7 +168,7 @@ defer(function() {
                                 }
                                 showProgress(i * 100 / requests.length);
                                 if (i + chunkSize < requests.length) {
-                                    setTimeout(sendChunk, 1500, i + chunkSize);
+                                    setTimeout(sendChunk, 1000, i + chunkSize);
                                 }
                             }
 
