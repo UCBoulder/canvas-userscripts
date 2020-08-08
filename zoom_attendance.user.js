@@ -5,12 +5,12 @@
 // @include      https://canvas.*.edu/*/gradebook
 // @include      https://*.*instructure.com/*/gradebook
 // @grant        none
-// @require      https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.16.4/xlsx.full.min.js
+// @require      https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.1.0/papaparse.min.js
 // @run-at       document-idle
-// @version      1.0.1
+// @version      1.1.0
 // ==/UserScript==
 
-/* globals $ XLSX */
+/* globals $ Papa */
 
 // wait until the window jQuery is loaded
 function defer(method) {
@@ -164,20 +164,54 @@ function dateFromSerial(serialDate) {
     return `${date.getMonth() + 1}-${date.getDate()}-${date.getFullYear()}`
 }
 
-// Get the data out of the selected XLSX file
+// Get the data out of the selected spreadsheet file
 function parseImport(importJson, callback) {
 
-    if (importJson.length < 4 || importJson[1].length < 3) {
-        popUp(`ERROR - The spreadsheet must have at least 4 rows and 3 columns. Re-download the Zoom participants report and try again.`, null);
+    // Validate spreadsheet format
+    let headerRow = null;
+    for (let i=0; i<importJson.length; i++) {
+        if (importJson[i].length > 0 && importJson[i][0].toLowerCase().includes('name')) {
+            headerRow = i;
+            break;
+        }
+    }
+    if (headerRow === null) {
+        popUp(`ERROR - Could not identify the name column of the spreadsheet. Re-download the Zoom participants export and try again.`, null);
         $("#zoom_file").show();
         return;
     }
+    if (!(importJson[headerRow].length > 1 && importJson[headerRow][1].toLowerCase().includes('email'))) {
+        popUp(`ERROR - Could not identify the email column of the spreadsheet. Re-download the Zoom participants export and try again.`, null);
+        $("#zoom_file").show();
+        return;
+    }
+    let minutesCol = null;
+    for (let i=2; i<importJson[headerRow].length; i++) {
+        if (importJson[headerRow][i].toLowerCase().includes('duration')) {
+            minutesCol = i;
+            break;
+        }
+    }
+    if (minutesCol === null) {
+        popUp(`ERROR - Could not identify the duration column of the spreadsheet. Re-download the Zoom participants export and try again.`, null);
+        $("#zoom_file").show();
+        return;
+    }
+    let startTimeCol = null;
+    for (let i=0; i<importJson[0].length; i++) {
+        if (importJson[0][i].toLowerCase().includes('start time')) {
+            startTimeCol = i;
+            break;
+        }
+    }
+    const startDate = startTimeCol !== null && importJson[1].length > startTimeCol ? importJson[1][startTimeCol].slice(0, 10) : "Unknown Date";
+
     // Extract users from the file
     let importUsers = [];
     let noImports = [];
-    for (const row of importJson.slice(4)) {
+    for (const row of importJson.slice(headerRow + 1)) {
         if (row.length >= 1 && row[1] && row[1].includes('@')) {
-            const minutes = row.length >= 2 ? row[2] : 0;
+            const minutes = row.length >= 2 ? row[minutesCol] : 0;
             importUsers.push({'username': row[1].split("@")[0], 'matched': false, 'minutes': minutes});
         } else if (row.length > 0 && row[0]) {
             noImports.push(row[0]);
@@ -190,7 +224,6 @@ function parseImport(importJson, callback) {
         let courseId = window.location.href.split('/')[4];
         popUp(`Checking course roster. Please wait...`, null);
         getAllPages(`/api/v1/courses/${courseId}/enrollments?type[]=StudentEnrollment&state[]=active&per_page=100`, function(enrollments) {
-            const startDate = !isNaN(importJson[1][2]) ? dateFromSerial(Math.floor(importJson[1][2])) : 'Unknown Date';
             let attendData = { 'date': startDate, 'users': [] };
             // For each student in the course, note the minutes if they're in the import; otherwise give them 0 minutes
             // Note which of the import users we were able to find matches in the course for
@@ -198,7 +231,7 @@ function parseImport(importJson, callback) {
                 let match = importUsers.find(item => item.username == enrollments[i].user.login_id);
                 if (match) {
                     match.matched = true;
-                    attendData.users.push({ 'userId': enrollments[i].user_id, 'username': match.username, 'minutes': match.minutes });
+                    attendData.users.push({ 'userId': enrollments[i].user_id, 'username': match.username, 'minutes': parseFloat(match.minutes) });
                 } else {
                     attendData.users.push({ 'userId': enrollments[i].user_id, 'username': enrollments[i].user.login_id, 'minutes': 0 });
                 }
@@ -341,21 +374,17 @@ defer(function() {
 
     // handle when file is selected
     $('#zoom_file').change(function(evt) {
-        let reader = new FileReader();
-        reader.onload = function(e) {
-            let workbook = XLSX.read(e.target.result, { type: "array" });
-            console.log(workbook);
-            let json = XLSX.utils.sheet_to_json(workbook.Sheets.in, {header:1});
-            parseImport(json, function(attendanceData) {
-                openOptionsForm(attendanceData.date, function(formData) {
-                    saveAttendance(formData, attendanceData);
-                });
-            });
-        };
-        if (!evt.target.files[0].name.endsWith('.xlsx')) {
-            popUp(`Must import an XLSX spreadsheet downloaded from Zoom.`, null);
+        if (!evt.target.files[0].name.endsWith('.csv')) {
+            popUp(`Must import a .csv spreadsheet downloaded from Zoom.`, null);
         } else {
-            reader.readAsArrayBuffer(evt.target.files[0]);
+            Papa.parse(evt.target.files[0], {
+                complete: function(results) {
+                    parseImport(results.data, function(attendanceData) {
+                        openOptionsForm(attendanceData.date, function(formData) {
+                            saveAttendance(formData, attendanceData);
+                        });
+                    });}
+            });
             $("#zoom_file").hide();
         }
         $("#zoom_file").val('');
