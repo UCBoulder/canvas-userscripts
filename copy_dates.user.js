@@ -4,11 +4,13 @@
 // @description  Copy all "Assign to" dates from one assignment to another, with offset.
 // @include      https://canvas.*.edu/courses/*/assignments/*
 // @include      https://*.*instructure.com/courses/*/assignments/*
+// @include      https://canvas.*.edu/courses/*/quizzes/*
+// @include      https://*.*instructure.com/courses/*/quizzes/*
 // @require      https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.2/moment-with-locales.min.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/moment-timezone/0.5.23/moment-timezone-with-data.min.js
 // @grant        none
 // @run-at       document-idle
-// @version      1.0.2
+// @version      1.1.0
 // ==/UserScript==
 
 /* globals $ moment */
@@ -23,48 +25,43 @@ function defer(method) {
     }
 }
 
-defer(function() {
-    'use strict';
+function popUp(text) {
+    $("#caod_dialog").html(`<p>${text}</p>`);
+    $("#caod_dialog").dialog();
+}
 
-    // prep jquery info dialog
-    $("body").append($('<div id="caod_dialog" title="Copy & Offset Dates"></div>'));
-    function popUp(text) {
-        $("#caod_dialog").html(`<p>${text}</p>`);
-        $("#caod_dialog").dialog();
-    }
-    function popClose() {
-        $("#caod_dialog").dialog("close");
-    }
+function popClose() {
+    $("#caod_dialog").dialog("close");
+}
 
-    // prep jquery form dialog
-    $("body").append($('<div id="caod_form_dialog" title="Copy & Offset Dates">'));
-    function openForm(assignments, srcAssign, infoMsg, selectedUnits, submitAction) {
-        // parse arguments that specify options
-        var infoHtml = "";
-        if (infoMsg) {
-            infoHtml = `<p><br>${infoMsg}</p>`;
-        }
-        var unitsOptions = `<option value="weeks">weeks</option>
+// Open the form dialog
+function openForm(assignments, srcAssign, infoMsg, selectedUnits, submitAction) {
+    // parse arguments that specify options
+    var infoHtml = "";
+    if (infoMsg) {
+        infoHtml = `<p><br>${infoMsg}</p>`;
+    }
+    var unitsOptions = `<option value="weeks">weeks</option>
 <option value="days">days</option>`;
-        if (selectedUnits === "weeks") {
-            unitsOptions = `<option value="weeks" selected>weeks</option>
+    if (selectedUnits === "weeks") {
+        unitsOptions = `<option value="weeks" selected>weeks</option>
 <option value="days">days</option>`
-        } else if (selectedUnits === "days") {
-            unitsOptions = `<option value="weeks">weeks</option>
+    } else if (selectedUnits === "days") {
+        unitsOptions = `<option value="weeks">weeks</option>
 <option value="days" selected>days</option>`
-        }
+    }
 
-        // built select options from assignment list
-        var assignOptions = '<option value="none_chosen"></option>';
-        $.each(assignments, function(index, assignment) {
-            if (assignment.id !== srcAssign.id) {
-                assignOptions = `${assignOptions}
+    // built select options from assignment list
+    var assignOptions = '<option value="none_chosen"></option>';
+    $.each(assignments, function(index, assignment) {
+        if (assignment.id !== srcAssign.id) {
+            assignOptions = `${assignOptions}
 <option value="${assignment.id}">${assignment.name}</option>`;
-            }
-        });
+        }
+    });
 
-        // build HTML
-        $("#caod_form_dialog").html(`
+    // build HTML
+    $("#caod_form_dialog").html(`
 <p>
 Copy all "Assign to" options and dates from the current assignment to another assignment. This will overwrite ALL "Assign to" options and dates for the destination assignment.
 </p>
@@ -89,106 +86,130 @@ ${unitsOptions}
 ${infoHtml}
 </form>`);
 
-        // on submit, send form data to submitAction
-        $("#caod_form").submit(function(event) {
-            event.preventDefault();
-            $("#caod_form_dialog").dialog("close");
-            submitAction($("#caod_form").serialize());
-        });
-        $("#caod_form_dialog").dialog({width: "375px"});
-    }
+    // on submit, send form data to submitAction
+    $("#caod_form").submit(function(event) {
+        event.preventDefault();
+        $("#caod_form_dialog").dialog("close");
+        submitAction($("#caod_form").serialize());
+    });
+    $("#caod_form_dialog").dialog({width: "375px"});
+}
 
-    // utility function for getting value based on field name from serialized form data
-    function getFormValue(name, serial) {
-        for (const elem of serial.split('&')) {
-            var pair = elem.split('=');
-            if (pair[0] === name) {
-                return pair[1];
-            }
+// utility function for getting value based on field name from serialized form data
+function getFormValue(name, serial) {
+    for (const elem of serial.split('&')) {
+        var pair = elem.split('=');
+        if (pair[0] === name) {
+            return pair[1];
         }
     }
+}
 
-    // respond to submitted form and actually perform the copy action
-    function processForm(formData, srcAssign, allAssigns, courseData) {
-        popUp("Copying dates. Please do not navigate away from this page.");
+// respond to submitted form and actually perform the copy action
+function processForm(formData, srcAssign, allAssigns, courseData) {
+    popUp("Copying dates. Please do not navigate away from this page.");
 
-        // extract data from submitted form
-        var destAssign = getFormValue('caod_assignment', formData);
-        var offset = getFormValue('caod_offset', formData) || 0;
-        var units = getFormValue('caod_offset_type', formData);
-        if (destAssign === "none_chosen") {
-            popClose();
-            openForm(allAssigns, srcAssign, "ERROR: You must choose a destination assignment", units, function(formData) { processForm(formData, srcAssign, allAssigns, courseData); });
-            return;
-        }
+    // extract data from submitted form
+    var destAssign = getFormValue('caod_assignment', formData);
+    var offset = getFormValue('caod_offset', formData) || 0;
+    var units = getFormValue('caod_offset_type', formData);
+    if (destAssign === "none_chosen") {
+        popClose();
+        openForm(allAssigns, srcAssign, "ERROR: You must choose a destination assignment", units, function(formData) { processForm(formData, srcAssign, allAssigns, courseData); });
+        return;
+    }
 
-        // copy and offset overrides for the parameters
-        var overrides = [];
-        $.each(srcAssign.overrides, function (srcIndex, srcElem) {
-            var override = JSON.parse(JSON.stringify(srcElem));
-            delete override.id;
-            delete override.assignment_id;
-            for (const dateType of ["due_at", "unlock_at", "lock_at"]) {
-                if (override[dateType]) {
-                    var dt = moment.tz(override[dateType], courseData.time_zone);
-                    dt.add(offset, units);
-                    override[dateType] = dt.utc().format();
-                } else {
-                    delete override[dateType];
-                }
-            }
-            overrides.push(override);
-        });
-        var params = { "assignment[assignment_overrides]": overrides };
-
-        // get "base" assignment dates/settings
+    // copy and offset overrides for the parameters
+    var overrides = [];
+    $.each(srcAssign.overrides, function (srcIndex, srcElem) {
+        var override = JSON.parse(JSON.stringify(srcElem));
+        delete override.id;
+        delete override.assignment_id;
         for (const dateType of ["due_at", "unlock_at", "lock_at"]) {
-            if (srcAssign[dateType]) {
-                var dt = moment.tz(srcAssign[dateType], courseData.time_zone);
+            if (override[dateType]) {
+                var dt = moment.tz(override[dateType], courseData.time_zone);
                 dt.add(offset, units);
-                params[`assignment[${dateType}]`] = dt.utc().format();
+                override[dateType] = dt.utc().format();
             } else {
-                params[`assignment[${dateType}]`] = "";
+                delete override[dateType];
             }
         }
-        params["assignment[only_visible_to_overrides]"] = srcAssign.only_visible_to_overrides;
+        overrides.push(override);
+    });
+    var params = { "assignment[assignment_overrides]": overrides };
 
-
-        // send the request, reload form on success
-        $.ajax({
-            url: `/api/v1/courses/${courseData.id}/assignments/${destAssign}`,
-            type: "PUT",
-            data: params,
-            dataType: "text"
-        }).fail(function (jqXHR, textStatus, errorThrown) {
-            popUp(`ERROR ${jqXHR.status} while updating assignment. Please refresh and try again.`);
-        }).done(function () {
-            popClose();
-            openForm(allAssigns, srcAssign, "Success! Dates copied.", units, function(formData) { processForm(formData, srcAssign, allAssigns, courseData); });
-        });
+    // get "base" assignment dates/settings
+    for (const dateType of ["due_at", "unlock_at", "lock_at"]) {
+        if (srcAssign[dateType]) {
+            var dt = moment.tz(srcAssign[dateType], courseData.time_zone);
+            dt.add(offset, units);
+            params[`assignment[${dateType}]`] = dt.utc().format();
+        } else {
+            params[`assignment[${dateType}]`] = "";
+        }
     }
+    params["assignment[only_visible_to_overrides]"] = srcAssign.only_visible_to_overrides;
+
+
+    // send the request, reload form on success
+    $.ajax({
+        url: `/api/v1/courses/${courseData.id}/assignments/${destAssign}`,
+        type: "PUT",
+        data: params,
+        dataType: "text"
+    }).fail(function (jqXHR, textStatus, errorThrown) {
+        popUp(`ERROR ${jqXHR.status} while updating assignment. Please refresh and try again.`);
+    }).done(function () {
+        popClose();
+        openForm(allAssigns, srcAssign, "Success! Dates copied.", units, function(formData) { processForm(formData, srcAssign, allAssigns, courseData); });
+    });
+}
+
+defer(function() {
+    'use strict';
+
+    $("body").append($('<div id="caod_dialog" title="Copy & Offset Dates"></div>'));
+    $("body").append($('<div id="caod_form_dialog" title="Copy & Offset Dates">'));
 
     // add offset dates button to assignment page
     if ($("#assignment_show > div.content-box").length) {
          // regular assignment
          $("#assignment_show > div.content-box").prepend($('<button type="button" id="caod_button" class="btn Button" role="button">Copy & Offset Dates</button>'));
+    } else if ($("#quiz_show div.preview_quiz_button").length) {
+        // "classic" quiz
+         $("#quiz_show div.preview_quiz_button").prepend($('<button type="button" id="caod_button" class="btn Button" role="button">Copy & Offset Dates</button>'));
     } else {
         // external tool assignment
         $("#content > div.tool_content_wrapper").after($('<div class="content-box"><button type="button" id="caod_button" class="btn Button" role="button">Copy & Offset Dates</button></div>'));
     }
+
     $("#caod_button").click(function() {
         popUp("Loading assignments. Please wait.");
 
         // get data necessary for rendering the form
         var courseId = window.location.href.split('/')[4];
         var srcAssignId = window.location.href.split('/')[6];
-        $.getJSON(`/api/v1/courses/${courseId}/assignments?per_page=100`, function(allAssigns) {
-            $.getJSON(`/api/v1/courses/${courseId}`, function(courseData) {
-                $.getJSON(`/api/v1/courses/${courseData.id}/assignments/${srcAssignId}?include[]=overrides&override_assignment_dates=false`, function(srcAssign) {
-                    popClose();
-                    openForm(allAssigns, srcAssign, null, null, function(formData) { processForm(formData, srcAssign, allAssigns, courseData); });
+        function loadForm(srcAssignId) {
+            $.getJSON(`/api/v1/courses/${courseId}/assignments?per_page=100`, function(allAssigns) {
+                $.getJSON(`/api/v1/courses/${courseId}`, function(courseData) {
+                    $.getJSON(`/api/v1/courses/${courseData.id}/assignments/${srcAssignId}?include[]=overrides&override_assignment_dates=false`, function(srcAssign) {
+                        popClose();
+                        openForm(allAssigns, srcAssign, null, null, function(formData) { processForm(formData, srcAssign, allAssigns, courseData); });
+                    });
                 });
             });
-        });
+        }
+
+        // get assignment id and load data for opening form
+        if (window.location.href.split('/')[5] === "quizzes") {
+            // "classic" quiz: need to get assignment id
+            var quizId = window.location.href.split('/')[6];
+            $.getJSON(`/api/v1/courses/${courseId}/quizzes/${quizId}`, function(quizData) {
+                loadForm(quizData.assignment_id);
+            });
+        } else {
+            // regular assignment: just get id from URL
+            loadForm(window.location.href.split('/')[6]);
+        }
     });
 });
