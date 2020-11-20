@@ -7,7 +7,7 @@
 // @grant        none
 // @require      https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.1.0/papaparse.min.js
 // @run-at       document-idle
-// @version      1.1.1
+// @version      1.1.2
 // ==/UserScript==
 
 /* globals $ Papa */
@@ -93,7 +93,7 @@ defer(function() {
         // parse CSV
         Papa.parse(evt.target.files[0], {
             header: true,
-            dynamicTyping: true,
+            dynamicTyping: false,
             complete: function(results) {
                 $("#comments_file").val('');
                 var data = results.data;
