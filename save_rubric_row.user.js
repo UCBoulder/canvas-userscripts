@@ -6,7 +6,7 @@
 // @include      https://*.*instructure.com/courses/*/gradebook/speed_grader?*
 // @grant        none
 // @run-at       document-idle
-// @version      1.0.2
+// @version      1.0.3
 // ==/UserScript==
 
 /* globals $ */
@@ -133,12 +133,12 @@ defer(function() {
         $('#rubric_assessments_list_and_edit_button_holder > div > button').click(function() {
             // Add in buttons if they don't already exist
             if ($('#save_row_0').length === 0) {
-                $('td.criterion_points').each(function(index) {
+                $('td[data-testid="criterion-points"]').each(function(index) {
                     var saveBtn = $(`<button type="button" class="Button Button--primary" id="save_row_${index}" style="margin-top: 0.375em">Save Row</button>`)
                     saveBtn.click(function() {
                         saveCriterion(index, function(success) {
                             if (success) {
-                                $($('td.criterion_points')[index]).append(`<span style="display: block; margin-top: 0.375em" id=save_row_${index}_alert role="alert">Saved!</span>`);
+                                $($('td[data-testid="criterion-points"]')[index]).append(`<span style="display: block; margin-top: 0.375em" id=save_row_${index}_alert role="alert">Saved!</span>`);
                                 setTimeout(function() {
                                     $(`#save_row_${index}_alert`).remove();
                                 }, 1500);
@@ -151,3 +151,4 @@ defer(function() {
         });
     });
 });
+
