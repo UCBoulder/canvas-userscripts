@@ -7,7 +7,7 @@
 // @grant        none
 // @require      https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.1.0/papaparse.min.js
 // @run-at       document-idle
-// @version      0.1.0
+// @version      0.2.0
 // ==/UserScript==
 
 /* globals $ Papa */
@@ -81,6 +81,9 @@ function getRemainingPages(nextUrl, listSoFar, callback) {
 }
 
 // Send a list of requests in chunks of 10 to avoid rate limiting
+// requests is a list of dicts with members:
+//  - request: The dict for the jquery request
+//  - error: The error message to display if the request fails
 function sendRequests(requests, successCallback, errorCallback) {
     var errors = [];
     var completed = 0;
@@ -115,8 +118,8 @@ function sendRequests(requests, successCallback, errorCallback) {
 }
 
 // Opens the main UI.
-// fileCallback should accept the file to validate along with a success callback that will be passed the csvData
-// importCallback should accept the csv data and will actually import it
+// fileCallback should accept the file to validate along with a success callback that will be passed the import requests
+// importCallback should accept the  import requests and will actually post the requests
 function openImportDialog(fileCallback, importCallback) {
     // build HTML
     $("#import_rubric_dialog").html(`
@@ -129,65 +132,103 @@ function openImportDialog(fileCallback, importCallback) {
 
     // when file is selected, validate data and enable Import button
     $('#import_rubric_file').change(function(evt) {
-        fileCallback(evt.target.files[0], function(csvData) {
+        fileCallback(evt.target.files[0], function(requestData) {
             $('#import_rubric_import_btn').removeAttr("disabled");
-            $('#import_rubric_import_btn').click(function() { $("#import_rubric_dialog").dialog("close"); importCallback(csvData); });
+            $('#import_rubric_import_btn').click(function() { $("#import_rubric_dialog").dialog("close"); importCallback(requestData); });
         });
     });
     $("#import_rubric_dialog").dialog({width: "375px"});
 }
 
 // Check that the spreadsheet data is in the correct format
+// Passes a list of HTTP requests to be made to successCallback
 function validateData(csvData, successCallback) {
-    $("#import_rubric_results").text(`Found ${csvData.length} rows.`);
-    successCallback(csvData);
+    let inData = csvData.filter( i => i["Student ID"] !== undefined );
+    let outData = inData.filter( i => i["Student ID"] !== "null" );
+    let allCriteria = Object.keys(outData[0]).filter( i => i.startsWith("Points: ")).map(i => i.slice(8));
+
+    // Check for errors
+    if (!inData.length) {
+        $("#import_rubric_results").text(`No data in CSV. Please choose a different file.`);
+    } if (!outData.length) {
+        $("#import_rubric_results").text(`No users found with valid (not "null") Student IDs. Please choose a different file.`);
+    } else if (!('Student Name' in outData[0])) {
+        $("#import_rubric_results").text(`No "Student Name" column found. Please double-check file format.`);
+    } else if (!('Student ID' in outData[0])) {
+        $("#import_rubric_results").text(`No "Student ID" column found. Please double-check file format.`);
+    } else if (!allCriteria.length) {
+        $("#import_rubric_results").text(`No column headers found in the form of "Points: {criterion name}". Please double-check file format.`);
+    } else {
+
+        // Get some initial data from the current URL
+        const courseId = window.location.href.split('/')[4];
+        const urlParams = window.location.href.split('?')[1].split('&');
+        var assignId;
+        for (const param of urlParams) {
+            if (param.split('=')[0] === "assignment_id") {
+                assignId = param.split('=')[1];
+                break;
+            }
+        }
+
+        // Get assignment data to match up criteria from file with those in Canvas
+        $.getJSON(`/api/v1/courses/${courseId}/assignments/${assignId}`, function(assignment) {
+            let matchedCriteria = allCriteria.filter(i => assignment.rubric.find(j => j.description === i));
+            if (!matchedCriteria.length) {
+                $("#import_rubric_results").text(`No criteria listed in the file match those listed for this assignment's rubric in Canvas. Please double-check file format.`);
+            } else {
+                let criteriaIds = {};
+                for (const criterion of matchedCriteria) {
+                    criteriaIds[criterion] = assignment.rubric.find(i => i.description === criterion).id;
+                }
+
+                // Identify any warnings based on CSV data
+                let notice = `<p>Ready to import scores for ${matchedCriteria.length} criteria and ${outData.length} user(s).</p>`;
+                if (matchedCriteria.length < allCriteria.length) {
+                    const unmatchedCriteria = allCriteria.filter(i => !assignment.rubric.find(j => j.description === i));
+                    notice += `<p>WARNING: These ${unmatchedCriteria.length} criteria could not be found in this assignment's rubric in Canvas and will be ignored:<br>${unmatchedCriteria.join('<br>')}.</p>`;
+                }
+                if ('Posted Score' in outData[0]) {
+                    notice += `<p>Note: "Posted Score" column will be ignored.</p>`;
+                }
+                if (outData.length < inData.length) {
+                    notice += `<p>Note: ${inData.length - outData.length} user(s) with a "null" Student ID will be ignored.</p>`;
+                }
+                $("#import_rubric_results").html(notice);
+
+                // Build requests
+                var requests = [];
+                for (const row of outData) {
+                    const endpoint = `/api/v1/courses/${courseId}/assignments/${assignId}/submissions/sis_user_id:${row["Student ID"]}`;
+                    var params = {};
+                    for (const criterion in criteriaIds) {
+                        params[`rubric_assessment[${criteriaIds[criterion]}][points]`] = row[`Points: ${criterion}`];
+                    }
+                    requests.push({request: {url: endpoint,
+                                             type: "PUT",
+                                             data: params,
+                                             dataType: "text" },
+                                   error: `Failed to import scores for student ${row["Student ID"]} using endpoint ${endpoint}. Response: `});
+                }
+                successCallback(requests);
+            }
+        });
+    }
 }
 
 // Actually import the data user by user
-// arg is a list of dicts with members:
-//  - user_id: the Canvas user id
-//  - criterion_{id}: the points that should be given for this criterion
-function importScores(csvData) {
-
-    // Get some initial data from the current URL
-    const courseId = window.location.href.split('/')[4];
-    const urlParams = window.location.href.split('?')[1].split('&');
-    var assignId;
-    for (const param of urlParams) {
-        if (param.split('=')[0] === "assignment_id") {
-            assignId = param.split('=')[1];
-            break;
-        }
-    }
-
-    // Get assignment data
-    $.getJSON(`/api/v1/courses/${courseId}/assignments/${assignId}`, function(assignment) {
-
-        // Build requests
-        var requests = [];
-        for (const row of csvData) {
-            const endpoint = `/api/v1/courses/${courseId}/assignments/${assignId}/submissions/sis_user_id:${row["Student ID"]}`;
-            var params = {};
-            for (const prop in row) {
-                if (prop.startsWith("Points: ")) {
-                    const criterionId = assignment.rubric.find( c => c.description === prop.slice(8) ).id;
-                    params[`rubric_assessment[${criterionId}][points]`] = row[prop];
-                }
-            }
-            requests.push({request: {url: endpoint,
-                                     type: "PUT",
-                                     data: params,
-                                     dataType: "text" },
-                           error: `Failed to import scores for student ${row["Student ID"]} using endpoint ${endpoint}. Response: `});
-        }
-        sendRequests(
-            requests,
-            function() { popUp("All scores/ratings imported successfully!", function() { location.reload(); }); },
-            function(errors) {
-                saveText(errors, "errors.txt");
-                popUp(`Import complete. WARNING: ${errors.length} rows failed to import. See errors.txt for details.`, function() { location.reload(); });
-            });
-    });
+// requests is a list of dicts with members:
+//  - request: The dict for the jquery request
+//  - error: The error message to display if the request fails
+function importScores(requests) {
+    $("#import_rubric_file").val('');
+    sendRequests(
+        requests,
+        function() { popUp("All scores/ratings imported successfully!", function() { location.reload(); }); },
+        function(errors) {
+            saveText(errors, "errors.txt");
+            popUp(`Import complete. WARNING: ${errors.length} rows failed to import. See errors.txt for details.`, function() { location.reload(); });
+        });
 }
 
 defer(function() {
@@ -208,7 +249,6 @@ defer(function() {
                     header: true,
                     dynamicTyping: false,
                     complete: function(results) {
-                        $("#import_rubric_file").val('');
                         validateData(results.data, successCallback);
                     }
                 });
