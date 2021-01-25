@@ -238,7 +238,7 @@ function parseImport(importJson, callback) {
     for (const row of importJson.slice(headerRow + 1)) {
         if (row.length >= 1 && row[1] && row[1].includes('@')) {
             const minutes = row.length >= 2 ? parseInt(row[minutesCol]) : 0;
-            allUsers.push({'username': row[1].split("@")[0], 'minutes': minutes});
+            allUsers.push({'username': row[1], 'minutes': minutes});
         } else if (row.length > 0 && row[0]) {
             noImports.push(row[0]);
         }
@@ -325,12 +325,25 @@ function saveAttendance(formData, spreadsheetData, assignment, submissions) {
         // Note which of the import users we were able to find matches in the course for
         let users = [];
         for (let i=0; i<enrollments.length; i++) {
-            let match = spreadsheetData.users.find(item => item.username == enrollments[i].user.login_id);
+            // First try to match using the email without the domain as the username
+            // That is, if the email is example@domain.com, try looking for the username "example"
+            // This is how CU Boulder's usernames are mapped
+            let match = spreadsheetData.users.find(item => item.username.split("@")[0] == enrollments[i].user.login_id);
             if (match) {
                 match.matched = true;
                 users.push({ 'userId': enrollments[i].user_id, 'username': match.username, 'minutes': parseFloat(match.minutes) });
             } else {
-                users.push({ 'userId': enrollments[i].user_id, 'username': enrollments[i].user.login_id, 'minutes': 0 });
+                // Before giving up, now try to match using the full email as the username
+                // That is, if the email is example@domain.com, try looking for the username "example@domain.com"
+                // This is how some other schools map their usernames
+                match = spreadsheetData.users.find(item => item.username == enrollments[i].user.login_id);
+                if (match) {
+                    match.matched = true;
+                    users.push({ 'userId': enrollments[i].user_id, 'username': match.username, 'minutes': parseFloat(match.minutes) });
+                } else {
+                    // No match could be found
+                    users.push({ 'userId': enrollments[i].user_id, 'username': enrollments[i].user.login_id, 'minutes': 0 });
+                }
             }
         }
         // Build a list of unmatched students to notify about
