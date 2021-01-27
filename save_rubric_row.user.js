@@ -6,7 +6,7 @@
 // @include      https://*.*instructure.com/courses/*/gradebook/speed_grader?*
 // @grant        none
 // @run-at       document-idle
-// @version      1.0.3
+// @version      1.0.4
 // ==/UserScript==
 
 /* globals $ */
@@ -41,7 +41,7 @@ function saveCriterion(rowIndex, callback) {
     var courseId = window.location.href.split('/')[4];
     var urlParams = window.location.href.split('?')[1].split('&');
     var assignId, studentId;
-    for (const param of urlParams) {
+    $.each(urlParams, function(i, param) {
         switch(param.split('=')[0]) {
             case "assignment_id":
                 assignId = param.split('=')[1];
@@ -50,7 +50,7 @@ function saveCriterion(rowIndex, callback) {
                 studentId = param.split('=')[1];
                 break;
         }
-    }
+    });
 
     // Get rubrics ids from the assignments API
     $.getJSON(`/api/v1/courses/${courseId}/assignments/${assignId}`, function(assignment) {
@@ -60,34 +60,29 @@ function saveCriterion(rowIndex, callback) {
 
             // Pre-load params with existing rubric assessment data
             var params = {};
-            var asmt = submission.rubric_assessment;
-            for (var rowKey in asmt) {
-                if (asmt.hasOwnProperty(rowKey)) {
-                    for (var cellKey in asmt[rowKey]) {
-                        if (asmt[rowKey].hasOwnProperty(cellKey)) {
-                            params[`rubric_assessment[${rowKey}][${cellKey}]`] = asmt[rowKey][cellKey];
-                        }
-                    }
-                }
-            }
+            $.each(submission.rubric_assessment, function(rowKey, rowValue) {
+                $.each(rowValue, function(cellKey, cellValue) {
+                    params[`rubric_assessment[${rowKey}][${cellKey}]`] = cellValue;
+                });
+            });
 
             // Get Canvas's identifier for the row to be updated
             var rowId = assignment.rubric[rowIndex].id;
 
             // Set the score based on the entered value for this rubric row
-            var score = $($('td.criterion_points input')[rowIndex]).val();
+            var score = $($('td[data-testid="criterion-points"] input')[rowIndex]).val();
             if (isNaN(score)) {
                 // Make sure the score is cleared if blank or invalid
                 params[`rubric_assessment[${rowId}][points]`] = undefined;
                 // Clear the field as well for the sake of clarity
-                $($('td.criterion_points input')[rowIndex]).val('');
+                $($('td[data-testid="criterion-points"] input')[rowIndex]).val('');
             } else {
                 params[`rubric_assessment[${rowId}][points]`] = score;
             }
 
             // Determine the index of the selected tier
             var tier;
-            $($('#rubric_full .rating-tier-list')[rowIndex]).find('.rating-tier').each(function(tierIndex) {
+            $($('td[data-testid="rubric-criterion"]')[rowIndex]).find('.rating-tier').each(function(tierIndex) {
                 if ($(this).hasClass("selected")) {
                     tier = tierIndex;
                 }
@@ -101,7 +96,7 @@ function saveCriterion(rowIndex, callback) {
             }
 
             // Get entered comments (comments should never be undefined)
-            var comments = $($('#rubric_full .rating-all')[rowIndex]).find('textarea').val();
+            var comments = $($('#rubric_full .edit-freeform-comments-small')[rowIndex]).find('textarea').val();
             if (comments === undefined) {
                 comments = "";
             }
@@ -151,4 +146,3 @@ defer(function() {
         });
     });
 });
-
