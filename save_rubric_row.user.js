@@ -6,7 +6,7 @@
 // @include      https://*.*instructure.com/courses/*/gradebook/speed_grader?*
 // @grant        none
 // @run-at       document-idle
-// @version      1.0.4
+// @version      1.0.5
 // ==/UserScript==
 
 /* globals $ */
@@ -69,20 +69,9 @@ function saveCriterion(rowIndex, callback) {
             // Get Canvas's identifier for the row to be updated
             var rowId = assignment.rubric[rowIndex].id;
 
-            // Set the score based on the entered value for this rubric row
-            var score = $($('td[data-testid="criterion-points"] input')[rowIndex]).val();
-            if (isNaN(score)) {
-                // Make sure the score is cleared if blank or invalid
-                params[`rubric_assessment[${rowId}][points]`] = undefined;
-                // Clear the field as well for the sake of clarity
-                $($('td[data-testid="criterion-points"] input')[rowIndex]).val('');
-            } else {
-                params[`rubric_assessment[${rowId}][points]`] = score;
-            }
-
             // Determine the index of the selected tier
             var tier;
-            $($('td[data-testid="rubric-criterion"]')[rowIndex]).find('.rating-tier').each(function(tierIndex) {
+            $($('tr[data-testid="rubric-criterion"]')[rowIndex]).find('.rating-tier').each(function(tierIndex) {
                 if ($(this).hasClass("selected")) {
                     tier = tierIndex;
                 }
@@ -95,8 +84,24 @@ function saveCriterion(rowIndex, callback) {
                 params[`rubric_assessment[${rowId}][rating_id]`] = assignment.rubric[rowIndex].ratings[tier].id;
             }
 
+            // If points are hidden, we will need to set them based on the chosen rating
+            if (assignment.rubric_settings.hide_points) {
+                params[`rubric_assessment[${rowId}][points]`] = assignment.rubric[rowIndex].ratings[tier].points;
+            } else {
+                // Otherwise, set points based on what's entered
+                const score = $($('td[data-testid="criterion-points"] input')[rowIndex]).val();
+                if (isNaN(score)) {
+                    // Make sure the score is cleared if blank or invalid
+                    params[`rubric_assessment[${rowId}][points]`] = undefined;
+                    // Clear the field as well for the sake of clarity
+                    $($('td[data-testid="criterion-points"] input')[rowIndex]).val('');
+                } else {
+                    params[`rubric_assessment[${rowId}][points]`] = score;
+                }
+            }
+
             // Get entered comments (comments should never be undefined)
-            var comments = $($('#rubric_full .edit-freeform-comments-small')[rowIndex]).find('textarea').val();
+            var comments = $($('#rubric_full tr[data-testid="rubric-criterion"]')[rowIndex]).find('textarea').val();
             if (comments === undefined) {
                 comments = "";
             }
