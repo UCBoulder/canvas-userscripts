@@ -6,7 +6,7 @@
 // @include      https://*.*instructure.com/courses/*/gradebook/speed_grader?*
 // @grant        none
 // @run-at       document-idle
-// @version      1.0.0
+// @version      1.1.0
 // ==/UserScript==
 
 /* globals $ */
@@ -88,88 +88,83 @@ defer(function() {
             popUp("Exporting scores, please wait...");
 
             // Get some initial data from the current URL
-            var courseId = window.location.href.split('/')[4];
-            var urlParams = window.location.href.split('?')[1].split('&');
-            var assignId;
-            for (const param of urlParams) {
-                if (param.split('=')[0] === "assignment_id") {
-                    assignId = param.split('=')[1];
-                    break;
-                }
-            }
+            const courseId = window.location.href.split('/')[4];
+            const urlParams = window.location.href.split('?')[1].split('&');
+            const assignId = urlParams.find(i => i.split('=')[0] === "assignment_id").split('=')[1];
 
             // Get the rubric data
             $.getJSON(`/api/v1/courses/${courseId}/assignments/${assignId}`, function(assignment) {
                 // Get the user data
                 getAllPages(`/api/v1/courses/${courseId}/enrollments?per_page=100`, function(enrollments) {
-                    function getUser(userId) {
-                        var user = null;
-                        $.each(enrollments, function(enrollIndex, enrollment) {
-                            if (enrollment.user_id === userId) {
-                                user = enrollment.user;
-                            }
-                        });
-                        return user;
-                    }
-
                     // Get the rubric score data
                     getAllPages(`/api/v1/courses/${courseId}/assignments/${assignId}/submissions?include[]=rubric_assessment&per_page=100`, function(submissions) {
+                        // If rubric is set to hide points, then also hide points in export
+                        // If rubric is set to use free form comments, then also hide ratings in export
+                        const hidePoints = assignment.rubric_settings.hide_points;
+                        const hideRatings = assignment.rubric_settings.free_form_criterion_comments;
+                        if (hidePoints && hideRatings) {
+                            popUp("ERROR: This rubric is configured to use free-form comments instead of ratings AND to hide points, so there is nothing to export!");
+                            return;
+                        }
 
                         // Fill out the csv header and map criterion ids to sort index
+                        // Also create an object that maps criterion ids to an object mapping rating ids to descriptions
                         var critOrder = {};
+                        var critRatingDescs = {};
                         var header = "Student Name,Student ID,Posted Score,Attempt Number";
                         $.each(assignment.rubric, function(critIndex, criterion) {
                             critOrder[criterion.id] = critIndex;
-                            header += `,Points: ${criterion.description}`;
+                            critRatingDescs[criterion.id] = {};
+                            $.each(criterion.ratings, function(i, rating) {
+                                critRatingDescs[criterion.id][rating.id] = rating.description;
+                            });
+                            if (!hideRatings) {
+                                header += `,Rating: ${criterion.description}`;
+                            }
+                            if (!hidePoints) {
+                                header += `,Points: ${criterion.description}`;
+                            }
                         });
                         header += '\n';
 
-                        var csvRows = [header];
-                        var subCount = 0;
-
-                        // Function to call for each user/submission, to output data when finished
-                        function recordSubmission(csvRow) {
-                            subCount++;
-                            csvRows.push(csvRow);
-                            if (subCount >= submissions.length) {
-                                popClose();
-                                saveText(csvRows, `Rubric Scores ${assignment.name.replace(/[^a-zA-Z 0-9]+/g)}.csv`);
-                            }
-                        }
-
                         // Iterate through submissions
+                        var csvRows = [header];
                         $.each(submissions, function(subIndex, submission) {
-                            var user = getUser(submission.user_id);
-                            if (user != null) {
+                            const user = enrollments.find(i => i.user_id === submission.user_id).user;
+                            if (user) {
                                 var row = `${user.name},${user.sis_user_id},${submission.score},${submission.attempt}`;
-                                // Add criteria scores
+                                // Add criteria scores and ratings
                                 // Need to turn rubric_assessment object into an array
                                 var crits = []
                                 var critIds = []
                                 if (submission.rubric_assessment != null) {
                                     $.each(submission.rubric_assessment, function(critKey, critValue) {
-                                        crits.push({'id': critKey, 'points':critValue.points});
+                                        crits.push({'id': critKey, 'points': critValue.points, 'rating': critRatingDescs[critKey][critValue.rating_id]});
                                         critIds.push(critKey);
                                     });
                                 }
-                                // Check for any scores that might be missing; set them to null
+                                // Check for any criteria entries that might be missing; set them to null
                                 $.each(critOrder, function(critKey, critValue) {
                                     if (!critIds.includes(critKey)) {
-                                        crits.push({'id': critKey, 'points':null});
+                                        crits.push({'id': critKey, 'points': null, 'rating': null});
                                     }
                                 });
                                 // Sort into same order as column order
                                 crits.sort(function(a, b) { return critOrder[a.id] - critOrder[b.id]; });
                                 $.each(crits, function(critIndex, criterion) {
-                                    row += `,${criterion.points}`;
+                                    if (!hideRatings) {
+                                        row += `,${criterion.rating}`
+                                    }
+                                    if (!hidePoints) {
+                                        row += `,${criterion.points}`;
+                                    }
                                 });
                                 row += '\n';
-                                recordSubmission(row);
-                            } else {
-                                // Still need to record something so that we'll know when all submissions have been checked
-                                recordSubmission(`Error: Could not find user ${submission.user_id}\n`);
+                                csvRows.push(row);
                             }
                         });
+                        popClose();
+                        saveText(csvRows, `Rubric Scores ${assignment.name.replace(/[^a-zA-Z 0-9]+/g, '')}.csv`);
                     });
                 });
             });
