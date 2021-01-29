@@ -6,7 +6,7 @@
 // @include      https://*.*instructure.com/courses/*/gradebook/speed_grader?*
 // @grant        none
 // @run-at       document-idle
-// @version      1.1.0
+// @version      1.2.0
 // ==/UserScript==
 
 /* globals $ */
@@ -60,6 +60,14 @@ function getRemainingPages(nextUrl, listSoFar, callback) {
             getRemainingPages(nextLink, listSoFar.concat(responseList), callback);
         }
     });
+}
+
+// escape commas and quotes for CSV formatting
+function csvEncode(string) {
+    if (string && (string.includes('"') || string.includes(','))) {
+        return `"${string.replace('"', '""')}"`;
+    }
+    return string;
 }
 
 defer(function() {
@@ -119,10 +127,10 @@ defer(function() {
                                 critRatingDescs[criterion.id][rating.id] = rating.description;
                             });
                             if (!hideRatings) {
-                                header += `,Rating: ${criterion.description}`;
+                                header += ',' + csvEncode('Rating: ' + criterion.description);
                             }
                             if (!hidePoints) {
-                                header += `,Points: ${criterion.description}`;
+                                header += ',' + csvEncode('Points: ' + criterion.description);
                             }
                         });
                         header += '\n';
@@ -153,7 +161,7 @@ defer(function() {
                                 crits.sort(function(a, b) { return critOrder[a.id] - critOrder[b.id]; });
                                 $.each(crits, function(critIndex, criterion) {
                                     if (!hideRatings) {
-                                        row += `,${criterion.rating}`
+                                        row += `,${csvEncode(criterion.rating)}`;
                                     }
                                     if (!hidePoints) {
                                         row += `,${criterion.points}`;
