@@ -7,7 +7,7 @@
 // @grant        none
 // @require      https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.1.0/papaparse.min.js
 // @run-at       document-idle
-// @version      0.3.0
+// @version      0.4.0
 // ==/UserScript==
 
 /* globals $ Papa */
@@ -98,11 +98,11 @@ function sendRequests(requests, successCallback, errorCallback) {
     var completed = 0;
     var chunkSize = 10;
     function sendChunk(i) {
-        for (const request of requests.slice(i, i + chunkSize)) {
+        $.each(requests.slice(i, i + chunkSize), function(i, request) {
             $.ajax(request.request).fail(function(jqXHR, textStatus, errorThrown) {
                 errors.push(`${request.error}${jqXHR.status} - ${errorThrown}\n`);
             }).always(requestSent);
-        }
+        });
         showProgress(i * 100 / requests.length);
         if (i + chunkSize < requests.length) {
             setTimeout(sendChunk, 1000, i + chunkSize);
@@ -154,7 +154,8 @@ function openImportDialog(fileCallback, importCallback) {
 function validateData(csvData, successCallback) {
     let inData = csvData.filter( i => i["Student ID"] !== undefined );
     let outData = inData.filter( i => i["Student ID"] !== "null" );
-    let allCriteria = Object.keys(outData[0]).filter( i => i.startsWith("Points: ")).map(i => i.slice(8));
+    let allPtsCriteria = Object.keys(outData[0]).filter( i => i.startsWith("Points: ")).map(i => i.slice(8));
+    let allRtgCriteria = Object.keys(outData[0]).filter( i => i.startsWith("Rating: ")).map(i => i.slice(8));
 
     // Check for errors
     if (!inData.length) {
@@ -165,46 +166,99 @@ function validateData(csvData, successCallback) {
         $("#import_rubric_results").text(`No "Student Name" column found. Please double-check file format.`);
     } else if (!('Student ID' in outData[0])) {
         $("#import_rubric_results").text(`No "Student ID" column found. Please double-check file format.`);
-    } else if (!allCriteria.length) {
-        $("#import_rubric_results").text(`No column headers found in the form of "Points: {criterion name}". Please double-check file format.`);
+    } else if (!allPtsCriteria.length && !allRtgCriteria.length) {
+        $("#import_rubric_results").text(`No column headers found in the form of "Points: {criterion name}" or "Rating: {criterion name}". Please double-check file format.`);
     } else {
         const courseId = window.location.href.split('/')[4];
         const assignId = getAssignId();
 
         // Get assignment data to match up criteria from file with those in Canvas
         $.getJSON(`/api/v1/courses/${courseId}/assignments/${assignId}`, function(assignment) {
-            let matchedCriteria = allCriteria.filter(i => assignment.rubric.find(j => j.description === i));
-            if (!matchedCriteria.length) {
+            // Identify ids to go with the criteria and build a list of warnings while we're at it
+            let criteriaIds = {};
+            let unmatchedCriteria = [];
+            let doubledCriteria = [];
+            $.each(allPtsCriteria, function(i, criterion) {
+                const id = assignment.rubric.find(i => i.description === criterion).id;
+                if (id) {
+                    criteriaIds[criterion] = id;
+                } else {
+                    unmatchedCriteria.push(criterion);
+                }
+            });
+            $.each(allRtgCriteria, function(i, criterion) {
+                const id = assignment.rubric.find(i => i.description === criterion).id;
+                if (id) {
+                    if (criterion in criteriaIds) {
+                        // Giving a criteria a rating when it already has a points value is redundant at best
+                        doubledCriteria.push(criterion);
+                    } else {
+                        criteriaIds[criterion] = id;
+                    }
+                } else {
+                    unmatchedCriteria.push(criterion);
+                }
+            });
+            if (!Object.keys(criteriaIds).length) {
                 $("#import_rubric_results").text(`No criteria listed in the file match those listed for this assignment's rubric in Canvas. Please double-check file format.`);
             } else {
-                let criteriaIds = {};
-                for (const criterion of matchedCriteria) {
-                    criteriaIds[criterion] = assignment.rubric.find(i => i.description === criterion).id;
-                }
 
-                // Identify any warnings based on CSV data
-                let notice = `<p>Ready to import scores for ${matchedCriteria.length} criteria and ${outData.length} user(s).</p>`;
-                if (matchedCriteria.length < allCriteria.length) {
-                    const unmatchedCriteria = allCriteria.filter(i => !assignment.rubric.find(j => j.description === i));
-                    notice += `<p>WARNING: These ${unmatchedCriteria.length} criteria could not be found in this assignment's rubric in Canvas and will be ignored:<br>${unmatchedCriteria.join('<br>')}.</p>`;
+                // Build list of score objects
+                function getRatingPoints(criterionId, ratingDesc) {
+                    const criterion = assignment.rubric.find(i => i.id === criterionId);
+                    return criterion.ratings.find(i => i.description === ratingDesc).points;
                 }
-                if ('Posted Score' in outData[0]) {
-                    notice += `<p>Note: "Posted Score" column will be ignored.</p>`;
+                function getRatingObj(criterionId, ratingDesc) {
+                    const criterion = assignment.rubric.find(i => i.id === criterionId);
+                    return criterion.ratings.find(i => i.description === ratingDesc);
                 }
-                if (outData.length < inData.length) {
-                    notice += `<p>Note: ${inData.length - outData.length} user(s) with a "null" Student ID will be ignored.</p>`;
-                }
-                $("#import_rubric_results").html(notice);
-
-                // Return list of score objects
                 function getScores(row) {
-                    let scores = {user: row['Student ID'], criteria: {}};
-                    for (const criterion in criteriaIds) {
-                        scores.criteria[criteriaIds[criterion]] = row[`Points: ${criterion}`];
-                    }
+                    let scores = {user: row['Student ID']};
+                    $.each(criteriaIds, function(criterion, critId) {
+                        // also map criteria ids each to an object giving the 'points' and possibly also the 'rating'
+                        // You can't just give Canvas a rating, even though Canvas knows how many points it's worth: you must always specify points
+                        if (`Points: ${criterion}` in row) {
+                            // When points are specified, ignore the rating, which might contradict the points and cause an error
+                            scores[critId] = {points: row[`Points: ${criterion}`]};
+                        } else {
+                            // When the rating alone is specified, we still need to dig up how many points it should be worth, or it will error
+                            const rating = getRatingObj(critId, row[`Rating: ${criterion}`]);
+                            scores[critId] = rating ? {points: rating.points, rating: rating.id} : {error: String(row[`Rating: ${criterion}`])};
+                        }
+                    });
                     return scores;
                 }
-                successCallback(outData.map(i => getScores(i)));
+                const scoreData = outData.map(i => getScores(i));
+                const badRows = scoreData.filter(i => Object.keys(i).find(j => j !== 'user' && 'error' in i[j] && i[j].error !== 'undefined' && i[j].error !== ''));
+                if (badRows.length) {
+                    let errors = [];
+                    $.each(badRows.slice(0, 5), function(i, scoreObj) {
+                        const badRating = scoreObj[Object.keys(scoreObj).find(i => i !== 'user' && 'error' in scoreObj[i])].error;
+                        errors.push(`ERROR: Rating "${badRating}" given for user ${scoreObj.user} does not match a rating on this rubric in Canvas.`);
+                    });
+                    let errTxt = errors.join('<br>');
+                    if (errors.length < badRows.length) {
+                        errTxt += `<br>...<br>(${badRows.length - errors.length} additional rating errors not shown)`;
+                    }
+                    $("#import_rubric_results").html(errTxt);
+                } else {
+                    // File is runnable, now display any warnings
+                    let notice = `<p>Ready to import scores for ${Object.keys(criteriaIds).length} criteria and ${outData.length} user(s).</p>`;
+                    if (unmatchedCriteria.length) {
+                        notice += `<p>WARNING: These ${unmatchedCriteria.length} criteria could not be found in this assignment's rubric in Canvas and will be ignored:<br>${unmatchedCriteria.join('<br>')}.</p>`;
+                    }
+                    if (doubledCriteria.length) {
+                        notice += `<p>WARNING: These ${doubledCriteria.length} criteria have both a rating and a points value given; the ratings will be ignored and auto-assigned by Canvas:<br>${doubledCriteria.join('<br>')}.</p>`;
+                    }
+                    if ('Posted Score' in outData[0]) {
+                        notice += `<p>Note: "Posted Score" column will be ignored.</p>`;
+                    }
+                    if (outData.length < inData.length) {
+                        notice += `<p>Note: ${inData.length - outData.length} user(s) with a "null" Student ID will be ignored.</p>`;
+                    }
+                    $("#import_rubric_results").html(notice);
+                    successCallback(scoreData);
+                }
             }
         });
     }
@@ -213,7 +267,7 @@ function validateData(csvData, successCallback) {
 // Actually import the data user by user
 // scores is a list of objects with properties:
 //  - user: The SIS User ID
-//  - criteria: An object mapping criteria ids to scores to post
+//  - plus any number of criteria ids mapped each to an object with property 'points' and optionally 'rating'
 function importScores(scores) {
     $("#import_rubric_file").val('');
     const courseId = window.location.href.split('/')[4];
@@ -226,7 +280,6 @@ function importScores(scores) {
     function pushRequest(request) {
         requests.push(request);
         if (requests.length === total) {
-            alert(JSON.stringify(requests));
             sendRequests(
                 requests,
                 function() { popUp("All scores/ratings imported successfully!", function() { location.reload(); }); },
@@ -245,21 +298,38 @@ function importScores(scores) {
         $.getJSON(`${endpoint}?include[]=rubric_assessment`, function(submission) {
             // Pre-load params with existing rubric assessment data
             var params = {};
-            const asmt = submission.rubric_assessment;
-            for (var rowKey in asmt) {
-                if (asmt.hasOwnProperty(rowKey)) {
-                    for (var cellKey in asmt[rowKey]) {
-                        if (asmt[rowKey].hasOwnProperty(cellKey)) {
-                            params[`rubric_assessment[${rowKey}][${cellKey}]`] = asmt[rowKey][cellKey];
+            if (submission.rubric_assessment) {
+                $.each(submission.rubric_assessment, function(rowKey, rowValue) {
+                    $.each(rowValue, function(cellKey, cellValue) {
+                        params[`rubric_assessment[${rowKey}][${cellKey}]`] = cellValue;
+                    });
+                    // Make sure the comments param is never left out or undefined; Canvas can't handle this
+                    if (!(`rubric_assessment[${rowKey}][comments]` in params) || params[`rubric_assessment[${rowKey}][comments]`] === undefined) {
+                        params[`rubric_assessment[${rowKey}][comments]`] = "";
+                    }
+                });
+            }
+            // Now fill in our points or ratings to be applied
+            $.each(userScore, function(critId, critScore) {
+                if (critId !== 'user') {
+                    if ('error' in critScore) {
+                        // These are "undefined" ratings, in which case we'll just clear the rating and score;
+                        params[`rubric_assessment[${critId}][points]`] = undefined;
+                        params[`rubric_assessment[${critId}][rating_id]`] = undefined;
+                    } else {
+                        params[`rubric_assessment[${critId}][points]`] = critScore.points;
+                        if ('rating' in critScore) {
+                            params[`rubric_assessment[${critId}][rating_id]`] = critScore.rating;
+                        } else {
+                            delete params[`rubric_assessment[${critId}][rating_id]`];
                         }
                     }
+                    // Again, ensure we don't leave out the comments field
+                    if (!(`rubric_assessment[${critId}][comments]` in params)) {
+                        params[`rubric_assessment[${critId}][comments]`] = "";
+                    }
                 }
-            }
-            // Now fill in our scores to be applied and ensure ratings are removed
-            for (const criterion in userScore.criteria) {
-                params[`rubric_assessment[${criterion}][points]`] = userScore.criteria[criterion];
-                delete params[`rubric_assessment[${criterion}][rating_id]`];
-            }
+            });
             pushRequest({request: {url: endpoint,
                                    type: "PUT",
                                    data: params,
