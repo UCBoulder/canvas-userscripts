@@ -7,7 +7,7 @@
 // @grant        none
 // @require      https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.1.0/papaparse.min.js
 // @run-at       document-idle
-// @version      1.4.0
+// @version      1.4.1
 // ==/UserScript==
 
 /* globals $ Papa */
@@ -237,7 +237,7 @@ function parseImport(importJson, callback) {
     let noImports = [];
     for (const row of importJson.slice(headerRow + 1)) {
         if (row.length >= 1 && row[1] && row[1].includes('@')) {
-            const minutes = row.length >= 2 ? parseInt(row[minutesCol]) : 0;
+            const minutes = row.length >= 2 && !isNaN(row[minutesCol]) ? parseInt(row[minutesCol]) : 0;
             allUsers.push({'username': row[1], 'minutes': minutes});
         } else if (row.length > 0 && row[0]) {
             noImports.push(row[0]);
