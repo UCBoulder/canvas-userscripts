@@ -6,7 +6,7 @@
 // @include      https://*.*instructure.com/courses/*/gradebook/speed_grader?*
 // @grant        none
 // @run-at       document-idle
-// @version      1.0.5
+// @version      1.0.6
 // ==/UserScript==
 
 /* globals $ */

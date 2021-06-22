@@ -10,7 +10,7 @@
 // @require      https://cdnjs.cloudflare.com/ajax/libs/moment-timezone/0.5.23/moment-timezone-with-data.min.js
 // @grant        none
 // @run-at       document-idle
-// @version      1.1.0
+// @version      1.1.1
 // ==/UserScript==
 
 /* globals $ moment */

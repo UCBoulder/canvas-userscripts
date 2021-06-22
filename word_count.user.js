@@ -6,7 +6,7 @@
 // @require      https://code.jquery.com/jquery-1.12.4.min.js
 // @grant        none
 // @run-at       document-idle
-// @version      1.0.2
+// @version      1.0.3
 // ==/UserScript==
 
 /* globals $ */

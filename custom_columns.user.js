@@ -6,7 +6,7 @@
 // @include      https://*.*instructure.com/*/gradebook
 // @grant        none
 // @run-at       document-idle
-// @version      1.1.0
+// @version      1.1.1
 // ==/UserScript==
 
 /* globals $ */
