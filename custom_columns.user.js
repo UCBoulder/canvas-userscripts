@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Custom Column Manager
-// @namespace    https://github.com/CUBoulder-OIT
+// @namespace    https://github.com/UCBoulder
 // @description  Add buttons to create and delete custom gradebook columns in Canvas LMS.
 // @include      https://canvas.*.edu/*/gradebook
 // @include      https://*.*instructure.com/*/gradebook

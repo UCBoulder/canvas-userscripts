@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Export Rubric Scores
-// @namespace    https://github.com/CUBoulder-OIT
+// @namespace    https://github.com/UCBoulder
 // @description  Export all rubric criteria scores for an assignment to a CSV
 // @include      https://canvas.*.edu/courses/*/gradebook/speed_grader?*
 // @include      https://*.*instructure.com/courses/*/gradebook/speed_grader?*

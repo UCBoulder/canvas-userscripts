@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Comments Importer
-// @namespace    https://github.com/CUBoulder-OIT
+// @namespace    https://github.com/UCBoulder
 // @description  Bulk import assignment comments into the Canvas gradebook.
 // @include      https://canvas.*.edu/*/gradebook
 // @include      https://*.*instructure.com/*/gradebook

@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Copy & Offset Assignment Dates
-// @namespace    https://github.com/CUBoulder-OIT
+// @namespace    https://github.com/UCBoulder
 // @description  Copy all "Assign to" dates from one assignment to another, with offset.
 // @include      https://canvas.*.edu/courses/*/assignments/*
 // @include      https://*.*instructure.com/courses/*/assignments/*

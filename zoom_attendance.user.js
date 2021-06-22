@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Import Zoom Attendance
-// @namespace    https://github.com/CUBoulder-OIT
+// @namespace    https://github.com/UCBoulder
 // @description  Create a graded attendance assignment based on a Zoom participants export.
 // @include      https://canvas.*.edu/*/gradebook
 // @include      https://*.*instructure.com/*/gradebook
