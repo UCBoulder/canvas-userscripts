@@ -7,7 +7,7 @@
 // @grant        none
 // @require      https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.1.0/papaparse.min.js
 // @run-at       document-idle
-// @version      1.4.1
+// @version      1.4.2
 // ==/UserScript==
 
 /* globals $ Papa */
@@ -57,7 +57,7 @@ function getRemainingPages(nextUrl, listSoFar, callback) {
     $.getJSON(nextUrl, function(responseList, textStatus, jqXHR) {
         let nextLink = null;
         $.each(jqXHR.getResponseHeader("link").split(','), function (linkIndex, linkEntry) {
-            if (linkEntry.split(';')[1].includes('rel="next"')) {
+            if (linkEntry.split('; ')[1] == 'rel="next"') {
                 nextLink = linkEntry.split(';')[0].slice(1, -1);
             }
         });
@@ -266,7 +266,7 @@ function identifyAssignment(formData, callback) {
     const assignGroup = getFormValue('zoom_assign_group', formData);
     const courseId = window.location.href.split('/')[4];
 
-    getAllPages(`/api/v1/courses/${courseId}/assignment_groups/${assignGroup}/assignments`, function(assignments) {
+    getAllPages(`/api/v1/courses/${courseId}/assignment_groups/${assignGroup}/assignments?per_page=100`, function(assignments) {
         let match = assignments.find(item => item.name == assignName);
         if (match) {
             let caveat = '';
