@@ -6,7 +6,7 @@
 // @include      https://*.*instructure.com/courses/*/gradebook/speed_grader?*
 // @grant        none
 // @run-at       document-idle
-// @version      1.0.6
+// @version      1.0.7
 // ==/UserScript==
 
 /* globals $ */
@@ -60,15 +60,16 @@ function saveCriterion(rowIndex, callback) {
 
             // Pre-load params with existing rubric assessment data
             var params = {};
-            $.each(submission.rubric_assessment, function(rowKey, rowValue) {
-                $.each(rowValue, function(cellKey, cellValue) {
-                    params[`rubric_assessment[${rowKey}][${cellKey}]`] = cellValue;
+            if ('rubric_assessment' in submission) {
+                $.each(submission.rubric_assessment, function(rowKey, rowValue) {
+                    $.each(rowValue, function(cellKey, cellValue) {
+                        params[`rubric_assessment[${rowKey}][${cellKey}]`] = cellValue;
+                    });
                 });
-            });
+            }
 
             // Get Canvas's identifier for the row to be updated
             var rowId = assignment.rubric[rowIndex].id;
-
             // Determine the index of the selected tier
             var tier;
             $($('tr[data-testid="rubric-criterion"]')[rowIndex]).find('.rating-tier').each(function(tierIndex) {
