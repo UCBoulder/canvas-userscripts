@@ -7,7 +7,7 @@
 // @grant        none
 // @require      https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.1.0/papaparse.min.js
 // @run-at       document-idle
-// @version      0.4.0
+// @version      1.0.0
 // ==/UserScript==
 
 /* globals $ Papa */
