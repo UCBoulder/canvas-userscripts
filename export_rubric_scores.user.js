@@ -6,7 +6,7 @@
 // @include      https://*.*instructure.com/courses/*/gradebook/speed_grader?*
 // @grant        none
 // @run-at       document-idle
-// @version      1.2.1
+// @version      1.2.2
 // ==/UserScript==
 
 /* globals $ */
@@ -65,7 +65,7 @@ function getRemainingPages(nextUrl, listSoFar, callback) {
 // escape commas and quotes for CSV formatting
 function csvEncode(string) {
     if (string && (string.includes('"') || string.includes(','))) {
-        return `"${string.replace('"', '""')}"`;
+        return '"' + string.replace(/"/g, '""') + '"';
     }
     return string;
 }
