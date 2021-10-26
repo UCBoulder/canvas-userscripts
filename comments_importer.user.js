@@ -7,7 +7,7 @@
 // @grant        none
 // @require      https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.1.0/papaparse.min.js
 // @run-at       document-idle
-// @version      1.1.3
+// @version      1.1.4
 // ==/UserScript==
 
 /* globals $ Papa */
@@ -81,7 +81,7 @@ defer(function() {
     }
 
     // add choose file button to gradebook
-    var importDiv = $(`<div style="padding-top:10px;>
+    var importDiv = $(`<div style="padding-top:10px">
 <label for="comments_file">Import comments: </label>
 <input type="file" id="comments_file"/>
 </div>`);

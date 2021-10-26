@@ -6,7 +6,7 @@
 // @include      https://*.*instructure.com/*/gradebook
 // @grant        none
 // @run-at       document-idle
-// @version      1.1.1
+// @version      1.1.2
 // ==/UserScript==
 
 /* globals $ */
@@ -94,7 +94,7 @@ defer(function() {
 <button class="btn" role="button" aria-label="Add Custom Column" id="addColumnBtn"><i class="icon-plus"/> Column</button>
 <button class="btn" role="button" aria-label="Delete Custom Column" id="rmColumnBtn">Delete Column</button>
 </div>`);
-    $("#gradebook-actions").prepend(colDiv);
+    $("#gradebook-actions").append(colDiv);
     $("#rmColumnBtn").click(rmColumn);
     $("#addColumnBtn").click(addColumn);
 });

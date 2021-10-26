@@ -7,7 +7,7 @@
 // @grant        none
 // @require      https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.1.0/papaparse.min.js
 // @run-at       document-idle
-// @version      1.4.3
+// @version      1.4.4
 // ==/UserScript==
 
 /* globals $ Papa */
@@ -466,7 +466,7 @@ defer(function() {
     $("#zoom_progress").dialog({ autoOpen: false, buttons: {} });
 
     // add choose file button to gradebook
-    let importDiv = $(`<div style="padding-top:10px;>
+    let importDiv = $(`<div style="padding-top:10px">
 <label for="zoom_file">Import Zoom attendance: </label>
 <input type="file" id="zoom_file"/>
 </div>`);
