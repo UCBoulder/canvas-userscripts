@@ -6,7 +6,7 @@
 // @include      https://*.*instructure.com/courses/*/gradebook/speed_grader?*
 // @grant        none
 // @run-at       document-idle
-// @version      1.2.2
+// @version      1.2.3
 // ==/UserScript==
 
 /* globals $ */
@@ -59,6 +59,9 @@ function getRemainingPages(nextUrl, listSoFar, callback) {
         } else {
             getRemainingPages(nextLink, listSoFar.concat(responseList), callback);
         }
+    }).fail(function (jqXHR, textStatus, errorThrown) {
+        popUp(`ERROR ${jqXHR.status} while retrieving data from Canvas. Url: ${nextUrl}<br/><br/>Please refresh and try again.`, null);
+        window.removeEventListener("error", showError);
     });
 }
 
@@ -68,6 +71,11 @@ function csvEncode(string) {
         return '"' + string.replace(/"/g, '""') + '"';
     }
     return string;
+}
+
+function showError(event) {
+    popUp(event.message);
+    window.removeEventListener("error", showError);
 }
 
 defer(function() {
@@ -94,6 +102,7 @@ defer(function() {
         $('#gradebook_header div.statsMetric').append('<button type="button" class="Button" id="export_rubric_btn">Export Rubric Scores</button>');
         $('#export_rubric_btn').click(function() {
             popUp("Exporting scores, please wait...");
+            window.addEventListener("error", showError);
 
             // Get some initial data from the current URL
             const courseId = window.location.href.split('/')[4];
@@ -122,11 +131,11 @@ defer(function() {
                         var header = "Student Name,Student ID,Posted Score,Attempt Number";
                         $.each(assignment.rubric, function(critIndex, criterion) {
                             critOrder[criterion.id] = critIndex;
-                            critRatingDescs[criterion.id] = {};
-                            $.each(criterion.ratings, function(i, rating) {
-                                critRatingDescs[criterion.id][rating.id] = rating.description;
-                            });
                             if (!hideRatings) {
+                                critRatingDescs[criterion.id] = {};
+                                $.each(criterion.ratings, function(i, rating) {
+                                    critRatingDescs[criterion.id][rating.id] = rating.description;
+                                });
                                 header += ',' + csvEncode('Rating: ' + criterion.description);
                             }
                             if (!hidePoints) {
@@ -147,7 +156,11 @@ defer(function() {
                                 var critIds = []
                                 if (submission.rubric_assessment != null) {
                                     $.each(submission.rubric_assessment, function(critKey, critValue) {
-                                        crits.push({'id': critKey, 'points': critValue.points, 'rating': critRatingDescs[critKey][critValue.rating_id]});
+                                        if (hideRatings) {
+                                            crits.push({'id': critKey, 'points': critValue.points, 'rating': null});
+                                        } else {
+                                            crits.push({'id': critKey, 'points': critValue.points, 'rating': critRatingDescs[critKey][critValue.rating_id]});
+                                        }
                                         critIds.push(critKey);
                                     });
                                 }
@@ -173,8 +186,12 @@ defer(function() {
                         });
                         popClose();
                         saveText(csvRows, `Rubric Scores ${assignment.name.replace(/[^a-zA-Z 0-9]+/g, '')}.csv`);
+                        window.removeEventListener("error", showError);
                     });
                 });
+            }).fail(function (jqXHR, textStatus, errorThrown) {
+                popUp(`ERROR ${jqXHR.status} while retrieving assignment data from Canvas. Please refresh and try again.`, null);
+                window.removeEventListener("error", showError);
             });
         });
     }
