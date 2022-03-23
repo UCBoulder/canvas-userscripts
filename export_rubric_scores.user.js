@@ -115,6 +115,14 @@ defer(function() {
                 getAllPages(`/api/v1/courses/${courseId}/enrollments?per_page=100`, function(enrollments) {
                     // Get the rubric score data
                     getAllPages(`/api/v1/courses/${courseId}/assignments/${assignId}/submissions?include[]=rubric_assessment&per_page=100`, function(submissions) {
+                        // Known Canvas bug where a rubric can appear in the UI but not in the API
+                        if (!('rubric_settings' in assignment)) {
+                            popUp(`ERROR: No rubric settings found at /api/v1/courses/${courseId}/assignments/${assignId}.<br/><br/> `
+                                  + 'This is likely due to a Canvas bug where a rubric has entered a "soft-deleted" state. '
+                                  + 'Please use the <a href="https://community.canvaslms.com/t5/Canvas-Admin-Blog/Undeleting-things-in-Canvas/ba-p/267116">Undelete feature</a> '
+                                  + 'to restore the rubric associated with this assignment or contact Canvas Support.');
+                            return;
+                        }
                         // If rubric is set to hide points, then also hide points in export
                         // If rubric is set to use free form comments, then also hide ratings in export
                         const hidePoints = assignment.rubric_settings.hide_points;
