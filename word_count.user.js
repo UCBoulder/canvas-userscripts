@@ -2,11 +2,11 @@
 // @name         Speedgrader Word Count
 // @namespace    https://github.com/UCBoulder
 // @description  Displays a word count for documents within Speedgrader
-// @include      https://canvadocs*.instructure.com/*
+// @match        https://canvadocs.instructure.com/*
 // @require      https://code.jquery.com/jquery-1.12.4.min.js
 // @grant        none
 // @run-at       document-idle
-// @version      1.0.3
+// @version      1.0.4
 // ==/UserScript==
 
 /* globals $ */

@@ -2,15 +2,13 @@
 // @name         Copy & Offset Assignment Dates
 // @namespace    https://github.com/UCBoulder
 // @description  Copy all "Assign to" dates from one assignment to another, with offset.
-// @include      https://canvas.*.edu/courses/*/assignments/*
-// @include      https://*.*instructure.com/courses/*/assignments/*
-// @include      https://canvas.*.edu/courses/*/quizzes/*
-// @include      https://*.*instructure.com/courses/*/quizzes/*
+// @match        https://*/courses/*/assignments/*
+// @match        https://*/courses/*/quizzes/*
 // @require      https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.2/moment-with-locales.min.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/moment-timezone/0.5.23/moment-timezone-with-data.min.js
 // @grant        none
 // @run-at       document-idle
-// @version      1.1.1
+// @version      1.1.2
 // ==/UserScript==
 
 /* globals $ moment */

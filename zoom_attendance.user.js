@@ -2,12 +2,11 @@
 // @name         Import Zoom Attendance
 // @namespace    https://github.com/UCBoulder
 // @description  Create a graded attendance assignment based on a Zoom participants export.
-// @include      https://canvas.*.edu/*/gradebook
-// @include      https://*.*instructure.com/*/gradebook
+// @match        https://*/courses/*/gradebook
 // @grant        none
 // @require      https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.1.0/papaparse.min.js
 // @run-at       document-idle
-// @version      1.4.4
+// @version      1.4.5
 // ==/UserScript==
 
 /* globals $ Papa */

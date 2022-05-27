@@ -2,11 +2,10 @@
 // @name         Save Rubric Row
 // @namespace    https://github.com/UCBoulder
 // @description  When in Speedgrader, save comments/score for just one row of a rubric at a time.
-// @include      https://canvas.*.edu/courses/*/gradebook/speed_grader?*
-// @include      https://*.*instructure.com/courses/*/gradebook/speed_grader?*
+// @match        https://*/courses/*/gradebook/speed_grader?*
 // @grant        none
 // @run-at       document-idle
-// @version      1.0.7
+// @version      1.0.8
 // ==/UserScript==
 
 /* globals $ */
