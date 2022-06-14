@@ -6,7 +6,7 @@
 // @grant        none
 // @require      https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.1.0/papaparse.min.js
 // @run-at       document-idle
-// @version      1.0.1
+// @version      1.0.2
 // ==/UserScript==
 
 /* globals $ Papa */
@@ -341,13 +341,11 @@ function importScores(scores) {
 defer(function() {
     'use strict';
 
-    $("body").append($('<div id="import_rubric_popup_dialog" title="Import Rubric Scores"></div>'));
-    $("body").append($('<div id="import_rubric_dialog" title="Import Rubric Scores"></div>'));
-    $("body").append($('<div id="import_rubric_progress" title="Import Rubric Scores"><p>Importing rubric scores. Do not navigate from this page.</p><div id="import_rubric_bar"></div></div>'));
-    $("#import_rubric_progress").dialog({ buttons: {}, autoOpen: false });
-
     // Only add the import button if a rubric is appearing
     if ($('#rubric_summary_holder').length > 0) {
+        $("body").append($('<div id="import_rubric_popup_dialog" title="Import Rubric Scores"></div>'));
+        $("body").append($('<div id="import_rubric_dialog" title="Import Rubric Scores"></div>'));
+        $("body").append($('<div id="import_rubric_progress" title="Import Rubric Scores"><p>Importing rubric scores. Do not navigate from this page.</p><div id="import_rubric_bar"></div></div>'));
         $('#gradebook_header div.statsMetric').append('<button type="button" class="Button" id="import_rubric_btn">Import Rubric Scores</button>');
         $('#import_rubric_btn').click(function() {
             openImportDialog(function(importFile, successCallback) {
