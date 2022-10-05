@@ -6,7 +6,7 @@
 // @grant        none
 // @require      https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.1.0/papaparse.min.js
 // @run-at       document-idle
-// @version      1.0.2
+// @version      1.0.3
 // ==/UserScript==
 
 /* globals $ Papa */
@@ -49,10 +49,11 @@ function popUp(text, callback) {
 }
 
 function showProgress(amount) {
+    $("#import_rubric_bar").progressbar({ value: amount });
+    $("#import_rubric_progress").dialog();
     if (amount === 100) {
         $("#import_rubric_progress").dialog("close");
     } else {
-        $("#import_rubric_bar").progressbar({ value: amount });
         $("#import_rubric_progress").dialog("open");
     }
 }
@@ -289,53 +290,61 @@ function importScores(scores) {
         }
     }
 
-    // Build each request
-    $.each(scores, function(index, userScore) {
-        const endpoint = `/api/v1/courses/${courseId}/assignments/${assignId}/submissions/sis_user_id:${userScore.user}`;
-        // Get existing rubric assessment from the submissions API
-        // This allows us to ensure that existing data like comments aren't overwritten
-        $.getJSON(`${endpoint}?include[]=rubric_assessment`, function(submission) {
-            // Pre-load params with existing rubric assessment data
-            var params = {};
-            if (submission.rubric_assessment) {
-                $.each(submission.rubric_assessment, function(rowKey, rowValue) {
-                    $.each(rowValue, function(cellKey, cellValue) {
-                        params[`rubric_assessment[${rowKey}][${cellKey}]`] = cellValue;
+    // Build each request by recursively iterating through scores to ensure GETs are sent one chunk at a time
+    const chunkSize = 10;
+    function buildRequests(chunkIndex) {
+        $.each(scores.slice(chunkIndex, chunkIndex + chunkSize), function(index, userScore) {
+            const endpoint = `/api/v1/courses/${courseId}/assignments/${assignId}/submissions/sis_user_id:${userScore.user}`;
+            // Get existing rubric assessment from the submissions API
+            // This allows us to ensure that existing data like comments aren't overwritten
+            $.getJSON(`${endpoint}?include[]=rubric_assessment`, function(submission) {
+                // Pre-load params with existing rubric assessment data
+                var params = {};
+                if (submission.rubric_assessment) {
+                    $.each(submission.rubric_assessment, function(rowKey, rowValue) {
+                        $.each(rowValue, function(cellKey, cellValue) {
+                            params[`rubric_assessment[${rowKey}][${cellKey}]`] = cellValue;
+                        });
+                        // Make sure the comments param is never left out or undefined; Canvas can't handle this
+                        if (!(`rubric_assessment[${rowKey}][comments]` in params) || params[`rubric_assessment[${rowKey}][comments]`] === undefined) {
+                            params[`rubric_assessment[${rowKey}][comments]`] = "";
+                        }
                     });
-                    // Make sure the comments param is never left out or undefined; Canvas can't handle this
-                    if (!(`rubric_assessment[${rowKey}][comments]` in params) || params[`rubric_assessment[${rowKey}][comments]`] === undefined) {
-                        params[`rubric_assessment[${rowKey}][comments]`] = "";
-                    }
-                });
-            }
-            // Now fill in our points or ratings to be applied
-            $.each(userScore, function(critId, critScore) {
-                if (critId !== 'user') {
-                    if ('error' in critScore) {
-                        // These are "undefined" ratings, in which case we'll just clear the rating and score;
-                        params[`rubric_assessment[${critId}][points]`] = undefined;
-                        params[`rubric_assessment[${critId}][rating_id]`] = undefined;
-                    } else {
-                        params[`rubric_assessment[${critId}][points]`] = critScore.points;
-                        if ('rating' in critScore) {
-                            params[`rubric_assessment[${critId}][rating_id]`] = critScore.rating;
+                }
+                // Now fill in our points or ratings to be applied
+                $.each(userScore, function(critId, critScore) {
+                    if (critId !== 'user') {
+                        if ('error' in critScore) {
+                            // These are "undefined" ratings, in which case we'll just clear the rating and score;
+                            params[`rubric_assessment[${critId}][points]`] = undefined;
+                            params[`rubric_assessment[${critId}][rating_id]`] = undefined;
                         } else {
-                            delete params[`rubric_assessment[${critId}][rating_id]`];
+                            params[`rubric_assessment[${critId}][points]`] = critScore.points;
+                            if ('rating' in critScore) {
+                                params[`rubric_assessment[${critId}][rating_id]`] = critScore.rating;
+                            } else {
+                                delete params[`rubric_assessment[${critId}][rating_id]`];
+                            }
+                        }
+                        // Again, ensure we don't leave out the comments field
+                        if (!(`rubric_assessment[${critId}][comments]` in params)) {
+                            params[`rubric_assessment[${critId}][comments]`] = "";
                         }
                     }
-                    // Again, ensure we don't leave out the comments field
-                    if (!(`rubric_assessment[${critId}][comments]` in params)) {
-                        params[`rubric_assessment[${critId}][comments]`] = "";
-                    }
-                }
+                });
+                pushRequest({request: {url: endpoint,
+                                       type: "PUT",
+                                       data: params,
+                                       dataType: "text" },
+                             error: `Failed to import scores for student ${userScore.user} using endpoint ${endpoint}. Response: `});
             });
-            pushRequest({request: {url: endpoint,
-                                   type: "PUT",
-                                   data: params,
-                                   dataType: "text" },
-                         error: `Failed to import scores for student ${userScore.user} using endpoint ${endpoint}. Response: `});
         });
-    });
+        if (chunkIndex + chunkSize < scores.length) {
+            setTimeout(buildRequests, 1000, chunkIndex + chunkSize);
+        }
+    }
+    // Start recursive iteration
+    buildRequests(0);
 }
 
 defer(function() {
