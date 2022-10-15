@@ -136,7 +136,7 @@ defer(function() {
                         // extract course id from url
                         var courseId = window.location.href.split('/')[4];
                         // build api url
-                        var subUrl = `/api/v1/courses/${courseId}/assignments/${assignId}/submissions/sis_user_id:${student}`;
+                        var subUrl = `/api/v1/courses/${courseId}/assignments/${assignId}/submissions/${student}`;
                         // build request and canned error message in case it fails
                         requests.push({
                             request: {
