@@ -4,19 +4,18 @@
 // @description  Export all rubric criteria scores for an assignment to a CSV
 // @match        https://*/courses/*/gradebook/speed_grader?*
 // @grant        none
+// @require      https://code.jquery.com/jquery-3.6.0.min.js
 // @run-at       document-idle
-// @version      1.2.4
+// @version      1.2.5
 // ==/UserScript==
 
 /* globals $ */
 
-// wait until the window jQuery is loaded
 function defer(method) {
     if (typeof $ !== 'undefined') {
         method();
-    }
-    else {
-        setTimeout(function() { defer(method); }, 100);
+    } else {
+        setTimeout(function () { defer(method); }, 100);
     }
 }
 
@@ -24,7 +23,7 @@ function waitForElement(selector, callback) {
     if ($(selector).length) {
         callback();
     } else {
-        setTimeout(function() {
+        setTimeout(function () {
             waitForElement(selector, callback);
         }, 100);
     }
@@ -43,28 +42,28 @@ function getAllPages(url, callback) {
     getRemainingPages(url, [], callback);
 }
 
-// Recursively work through paginated JSON list
 function getRemainingPages(nextUrl, listSoFar, callback) {
-    $.getJSON(nextUrl, function(responseList, textStatus, jqXHR) {
-        var nextLink = null;
-        $.each(jqXHR.getResponseHeader("link").split(','), function (linkIndex, linkEntry) {
-            if (linkEntry.split(';')[1].includes('rel="next"')) {
-                nextLink = linkEntry.split(';')[0].slice(1, -1);
-            }
-        });
-        if (nextLink == null) {
-            // all pages have been retrieved
+    $.getJSON(nextUrl, function (responseList, textStatus, jqXHR) {
+        let nextLink = null;
+        const linkHeader = jqXHR.getResponseHeader("link");
+        if (linkHeader) {
+            $.each(linkHeader.split(','), function (linkIndex, linkEntry) {
+                if (linkEntry.split(';')[1].includes('rel="next"')) {
+                    nextLink = linkEntry.split(';')[0].slice(1, -1);
+                }
+            });
+        }
+        if (!nextLink) {
             callback(listSoFar.concat(responseList));
         } else {
             getRemainingPages(nextLink, listSoFar.concat(responseList), callback);
         }
     }).fail(function (jqXHR, textStatus, errorThrown) {
-        popUp(`ERROR ${jqXHR.status} while retrieving data from Canvas. Url: ${nextUrl}<br/><br/>Please refresh and try again.`, null);
+        popUp(`ERROR ${jqXHR.status} while retrieving data from Canvas. Url: ${nextUrl}<br/><br/>Please refresh and try again.`);
         window.removeEventListener("error", showError);
     });
 }
 
-// escape commas and quotes for CSV formatting
 function csvEncode(string) {
     if (string && (string.includes('"') || string.includes(','))) {
         return '"' + string.replace(/"/g, '""') + '"';
@@ -73,74 +72,76 @@ function csvEncode(string) {
 }
 
 function showError(event) {
-    popUp(event.message);
+    popUp("JavaScript error: " + event.message);
     window.removeEventListener("error", showError);
 }
 
-defer(function() {
+defer(function () {
     'use strict';
 
-    // utility function for downloading a file
     var saveText = (function () {
         var a = document.createElement("a");
         document.body.appendChild(a);
         a.style = "display: none";
         return function (textArray, fileName) {
-            var blob = new Blob(textArray, {type: "text"}),
+            var blob = new Blob(textArray, { type: "text" }),
                 url = window.URL.createObjectURL(blob);
             a.href = url;
             a.download = fileName;
             a.click();
             window.URL.revokeObjectURL(url);
         };
-    }());
+    })();
 
     $("body").append($('<div id="export_rubric_dialog" title="Export Rubric Scores"></div>'));
-    // Only add the export button if a rubric is appearing
-    if ($('#rubric_summary_holder').length > 0) {
-        $('#gradebook_header div.statsMetric').append('<button type="button" class="Button" id="export_rubric_btn">Export Rubric Scores</button>');
-        $('#export_rubric_btn').click(function() {
+
+    try {
+        if ($('#rubric_summary_holder').length > 0) {
+            $('#gradebook_header div.statsMetric').append('<button type="button" class="Button" id="export_rubric_btn">Export Rubric Scores</button>');
+        } else {
+            console.warn("Rubric summary holder not found. Export button not inserted.");
+        }
+    } catch (e) {
+        popUp("DOM error while trying to insert export button: " + e.message);
+    }
+
+    $('#export_rubric_btn').click(function () {
+        try {
             popUp("Exporting scores, please wait...");
             window.addEventListener("error", showError);
 
-            // Get some initial data from the current URL
             const courseId = window.location.href.split('/')[4];
             const urlParams = window.location.href.split('?')[1].split('&');
             const assignId = urlParams.find(i => i.split('=')[0] === "assignment_id").split('=')[1];
 
-            // Get the rubric data
-            $.getJSON(`/api/v1/courses/${courseId}/assignments/${assignId}`, function(assignment) {
-                // Get the user data
-                getAllPages(`/api/v1/courses/${courseId}/enrollments?per_page=100`, function(enrollments) {
-                    // Get the rubric score data
-                    getAllPages(`/api/v1/courses/${courseId}/assignments/${assignId}/submissions?include[]=rubric_assessment&per_page=100`, function(submissions) {
-                        // Known Canvas bug where a rubric can appear in the UI but not in the API
+            $.getJSON(`/api/v1/courses/${courseId}/assignments/${assignId}`, function (assignment) {
+                getAllPages(`/api/v1/courses/${courseId}/enrollments?per_page=100`, function (enrollments) {
+                    getAllPages(`/api/v1/courses/${courseId}/assignments/${assignId}/submissions?include[]=rubric_assessment&per_page=100`, function (submissions) {
+
                         if (!('rubric_settings' in assignment)) {
-                            popUp(`ERROR: No rubric settings found at /api/v1/courses/${courseId}/assignments/${assignId}.<br/><br/> `
-                                  + 'This is likely due to a Canvas bug where a rubric has entered a "soft-deleted" state. '
-                                  + 'Please use the <a href="https://community.canvaslms.com/t5/Canvas-Admin-Blog/Undeleting-things-in-Canvas/ba-p/267116">Undelete feature</a> '
-                                  + 'to restore the rubric associated with this assignment or contact Canvas Support.');
+                            popUp(`ERROR: No rubric settings found at /api/v1/courses/${courseId}/assignments/${assignId}.<br/><br/>
+                                This is likely due to a Canvas bug where a rubric has entered a "soft-deleted" state.
+                                Please use the <a href="https://community.canvaslms.com/t5/Canvas-Admin-Blog/Undeleting-things-in-Canvas/ba-p/267116">Undelete feature</a>
+                                to restore the rubric associated with this assignment or contact Canvas Support.`);
                             return;
                         }
-                        // If rubric is set to hide points, then also hide points in export
-                        // If rubric is set to use free form comments, then also hide ratings in export
+
                         const hidePoints = assignment.rubric_settings.hide_points;
                         const hideRatings = assignment.rubric_settings.free_form_criterion_comments;
+
                         if (hidePoints && hideRatings) {
                             popUp("ERROR: This rubric is configured to use free-form comments instead of ratings AND to hide points, so there is nothing to export!");
                             return;
                         }
 
-                        // Fill out the csv header and map criterion ids to sort index
-                        // Also create an object that maps criterion ids to an object mapping rating ids to descriptions
-                        var critOrder = {};
-                        var critRatingDescs = {};
-                        var header = "Student Name,Student ID,Posted Score,Attempt Number";
-                        $.each(assignment.rubric, function(critIndex, criterion) {
+                        let critOrder = {};
+                        let critRatingDescs = {};
+                        let header = "Student Name,Student ID,Posted Score,Attempt Number";
+                        $.each(assignment.rubric, function (critIndex, criterion) {
                             critOrder[criterion.id] = critIndex;
                             if (!hideRatings) {
                                 critRatingDescs[criterion.id] = {};
-                                $.each(criterion.ratings, function(i, rating) {
+                                $.each(criterion.ratings, function (i, rating) {
                                     critRatingDescs[criterion.id][rating.id] = rating.description;
                                 });
                                 header += ',' + csvEncode('Rating: ' + criterion.description);
@@ -151,35 +152,34 @@ defer(function() {
                         });
                         header += '\n';
 
-                        // Iterate through submissions
                         var csvRows = [header];
-                        $.each(submissions, function(subIndex, submission) {
-                            const user = enrollments.find(i => i.user_id === submission.user_id).user;
-                            if (user) {
-                                var row = `${user.name},${user.sis_user_id},${submission.score},${submission.attempt}`;
-                                // Add criteria scores and ratings
-                                // Need to turn rubric_assessment object into an array
-                                var crits = []
-                                var critIds = []
+                        $.each(submissions, function (subIndex, submission) {
+                            const enrollment = enrollments.find(i => i.user_id === submission.user_id);
+                            if (enrollment && enrollment.user) {
+                                const user = enrollment.user;
+                                let row = `${user.name},${user.sis_user_id},${submission.score},${submission.attempt}`;
+
+                                let crits = [];
+                                let critIds = [];
                                 if (submission.rubric_assessment != null) {
-                                    $.each(submission.rubric_assessment, function(critKey, critValue) {
-                                        if (hideRatings) {
-                                            crits.push({'id': critKey, 'points': critValue.points, 'rating': null});
-                                        } else {
-                                            crits.push({'id': critKey, 'points': critValue.points, 'rating': critRatingDescs[critKey][critValue.rating_id]});
-                                        }
+                                    $.each(submission.rubric_assessment, function (critKey, critValue) {
+                                        crits.push({
+                                            id: critKey,
+                                            points: critValue.points ?? null,
+                                            rating: hideRatings ? null : (critRatingDescs[critKey]?.[critValue.rating_id] ?? null)
+                                        });
                                         critIds.push(critKey);
                                     });
                                 }
-                                // Check for any criteria entries that might be missing; set them to null
-                                $.each(critOrder, function(critKey, critValue) {
+
+                                $.each(critOrder, function (critKey) {
                                     if (!critIds.includes(critKey)) {
-                                        crits.push({'id': critKey, 'points': null, 'rating': null});
+                                        crits.push({ id: critKey, points: null, rating: null });
                                     }
                                 });
-                                // Sort into same order as column order
-                                crits.sort(function(a, b) { return critOrder[a.id] - critOrder[b.id]; });
-                                $.each(crits, function(critIndex, criterion) {
+
+                                crits.sort(function (a, b) { return critOrder[a.id] - critOrder[b.id]; });
+                                $.each(crits, function (critIndex, criterion) {
                                     if (!hideRatings) {
                                         row += `,${csvEncode(criterion.rating)}`;
                                     }
@@ -191,15 +191,21 @@ defer(function() {
                                 csvRows.push(row);
                             }
                         });
+
                         popClose();
-                        saveText(csvRows, `Rubric Scores ${assignment.name.replace(/[^a-zA-Z 0-9]+/g, '')}.csv`);
+                        const fileName = `Rubric_Scores_${assignment.name.replace(/[^a-zA-Z0-9]/g, '_')}.csv`;
+                        saveText(csvRows, fileName);
                         window.removeEventListener("error", showError);
                     });
                 });
             }).fail(function (jqXHR, textStatus, errorThrown) {
-                popUp(`ERROR ${jqXHR.status} while retrieving assignment data from Canvas. Please refresh and try again.`, null);
+                popUp(`ERROR ${jqXHR.status} while retrieving assignment data from Canvas. Please refresh and try again.`);
                 window.removeEventListener("error", showError);
             });
-        });
-    }
+
+        } catch (e) {
+            popUp("Unexpected error: " + e.message);
+            window.removeEventListener("error", showError);
+        }
+    });
 });
