@@ -5,8 +5,9 @@
 // @match        https://*/courses/*/gradebook/speed_grader?*
 // @grant        none
 // @require      https://code.jquery.com/jquery-3.6.0.min.js
+// @require      https://code.jquery.com/ui/1.14.1/jquery-ui.min.js
 // @run-at       document-idle
-// @version      1.2.5
+// @version      1.2.6
 // ==/UserScript==
 
 /* globals $ */
